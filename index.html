@@ -3,475 +3,715 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Reportes financieros desde CSV (offline)</title>
+  <title>Reportes CSV - Unidades / Horas / Boletas / Facturas / Ventas</title>
   <style>
-    :root { --border:#e5e7eb; --muted:#6b7280; --bg:#f6f7fb; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, Arial, sans-serif;
-           margin: 0; background: var(--bg); color:#111827; }
-    .wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
-    header { display:flex; gap:16px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
-    h1 { margin: 0; font-size: 22px; letter-spacing: .2px; }
-    p { margin: 8px 0 0; color: var(--muted); line-height: 1.4; }
-    .card { background: white; border: 1px solid var(--border); border-radius: 16px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
-    .grid { display:grid; gap: 12px; }
-    .controls { grid-template-columns: 1fr; }
-    @media (min-width: 760px){ .controls { grid-template-columns: 1.2fr .8fr; } }
-    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    label { font-weight: 600; font-size: 13px; color:#111827; }
-    input[type="file"], select, button {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 14px;
-      background: #fff;
-    }
-    button { cursor: pointer; }
-    button.primary { background:#111827; color:#fff; border-color:#111827; }
-    button:disabled { opacity:.5; cursor:not-allowed; }
-    .kpis { grid-template-columns: 1fr 1fr; }
-    @media (min-width: 760px){ .kpis { grid-template-columns: repeat(4, 1fr); } }
-    .kpi .name { font-size: 12px; color: var(--muted); }
-    .kpi .val { font-size: 18px; font-weight: 700; margin-top: 6px; }
-    .section-title { margin: 18px 0 10px; font-size: 14px; color:#111827; }
-    table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 14px; border: 1px solid var(--border); background:#fff; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
-    th { text-align: left; color:#111827; background:#fafafa; font-weight: 700; }
-    tr:last-child td { border-bottom: none; }
-    td.num { text-align:right; font-variant-numeric: tabular-nums; }
-    .muted { color: var(--muted); font-size: 13px; }
-    .error { color:#b91c1c; font-weight: 600; }
-    .pill { display:inline-flex; align-items:center; gap:8px; padding: 8px 10px; border:1px solid var(--border); border-radius: 999px; background:#fff; }
-    code { background:#f3f4f6; padding:2px 6px; border-radius: 8px; }
+    :root{--b:#e5e7eb;--m:#6b7280;--bg:#f6f7fb;}
+    body{margin:0;background:var(--bg);color:#111827;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Arial,sans-serif;}
+    .wrap{max-width:1100px;margin:0 auto;padding:22px;}
+    h1{margin:0;font-size:20px;}
+    .sub{margin-top:6px;color:var(--m);line-height:1.4;font-size:13px;}
+    .grid{display:grid;gap:12px;}
+    .topgrid{grid-template-columns:1fr;}
+    @media(min-width:900px){.topgrid{grid-template-columns:1.2fr .8fr;}}
+    .card{background:#fff;border:1px solid var(--b);border-radius:16px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    label{font-weight:800;font-size:13px;}
+    input[type=file],button,select{border:1px solid var(--b);border-radius:12px;padding:10px 12px;background:#fff;font-size:14px;}
+    button{cursor:pointer}
+    button.primary{background:#111827;color:#fff;border-color:#111827;}
+    button:disabled{opacity:.55;cursor:not-allowed;}
+    .pill{display:inline-flex;gap:8px;align-items:center;padding:7px 10px;border:1px solid var(--b);border-radius:999px;background:#fff;color:#111827;font-size:12px;}
+    .muted{color:var(--m);font-size:13px;line-height:1.4;}
+    .err{color:#b91c1c;font-weight:800;}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;}
+    .tab{border:1px solid var(--b);border-radius:999px;padding:8px 12px;background:#fff;font-weight:800;font-size:13px;cursor:pointer;}
+    .tab.active{background:#111827;color:#fff;border-color:#111827;}
+    .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+    @media(min-width:900px){.kpis{grid-template-columns:repeat(4,1fr);}}
+    .kpi .name{color:var(--m);font-size:12px;}
+    .kpi .val{font-size:18px;font-weight:900;margin-top:6px;font-variant-numeric:tabular-nums;}
+    .title{margin:16px 0 10px;font-size:14px;font-weight:900;}
+    table{width:100%;border-collapse:collapse;border:1px solid var(--b);border-radius:14px;overflow:hidden;background:#fff;}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--b);font-size:13px;}
+    th{background:#fafafa;text-align:left;font-weight:900;}
+    tr:last-child td{border-bottom:none;}
+    td.num{text-align:right;font-variant-numeric:tabular-nums;}
+    code{background:#f3f4f6;padding:2px 6px;border-radius:8px;}
+    .small{font-size:12px;color:var(--m);}
+    .filelist{margin:8px 0 0;padding-left:18px;color:var(--m);font-size:13px;}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div>
-        <h1>Reportes financieros desde CSV (abre directo en Mac)</h1>
-        <p>Carga tu archivo <code>.csv</code> y obtén totales, resumen mensual y por categoría. Funciona <b>sin internet</b>.</p>
-      </div>
-      <div class="row">
-        <button id="btnSample" class="primary">Descargar CSV de ejemplo</button>
-      </div>
-    </header>
-
-    <div class="grid controls" style="margin-top:16px;">
-      <div class="card">
-        <div class="row">
-          <div style="flex:1; min-width:240px;">
-            <label for="file">Tu CSV</label><br/>
-            <input type="file" id="file" accept=".csv,text/csv" />
-            <div class="muted" style="margin-top:8px;">
-              Columnas esperadas: <code>fecha</code>, <code>descripcion</code>, <code>categoria</code>, <code>cuenta</code>, <code>monto</code> (y opcional <code>moneda</code>).
-            </div>
-          </div>
-
-          <div style="min-width:220px;">
-            <label for="delim">Separador</label><br/>
-            <select id="delim">
-              <option value="auto" selected>Auto</option>
-              <option value=",">Coma (,)</option>
-              <option value=";">Punto y coma (;)</option>
-              <option value="\t">Tab</option>
-            </select>
-            <div class="muted" style="margin-top:8px;">
-              Si tu CSV está en Excel (español), suele ser <code>;</code>.
-            </div>
-          </div>
-        </div>
-
-        <div class="row" style="margin-top:12px;">
-          <span class="pill"><b>Tip:</b> gastos negativos, ingresos positivos</span>
-          <span class="pill">Fechas formato <code>YYYY-MM-DD</code></span>
-        </div>
-
-        <div id="msg" style="margin-top:12px;"></div>
-      </div>
-
-      <div class="card">
-        <div class="section-title">Acciones</div>
-        <div class="row">
-          <button id="btnJSON" disabled>Descargar reporte (JSON)</button>
-          <button id="btnCSV" disabled>Descargar resumen (CSV)</button>
-        </div>
-        <div class="muted" style="margin-top:10px;">
-          El reporte se genera en tu computador. No se sube nada a internet.
-        </div>
+<div class="wrap">
+  <div class="row" style="justify-content:space-between; align-items:flex-start;">
+    <div>
+      <h1>Reporte CSV por Unidades de Negocio</h1>
+      <div class="sub">
+        Carga múltiples CSV por categoría (Horas, Boletas, Facturas, Ventas) y genera resumen por Unidad/Área.
+        Todo se procesa <b>en tu navegador</b> (GitHub Pages no guarda archivos).
       </div>
     </div>
-
-    <div class="grid kpis" style="margin-top:12px;">
-      <div class="card kpi"><div class="name">Movimientos</div><div class="val" id="kpiCount">—</div></div>
-      <div class="card kpi"><div class="name">Ingresos</div><div class="val" id="kpiIn">—</div></div>
-      <div class="card kpi"><div class="name">Gastos</div><div class="val" id="kpiOut">—</div></div>
-      <div class="card kpi"><div class="name">Neto</div><div class="val" id="kpiNet">—</div></div>
-    </div>
-
-    <div class="section-title">Resumen mensual</div>
-    <div id="monthlyWrap"></div>
-
-    <div class="section-title">Por categoría</div>
-    <div id="catWrap"></div>
-
-    <div class="section-title">Vista previa (primeras 20 filas)</div>
-    <div id="previewWrap"></div>
-
-    <div class="muted" style="margin:18px 0 6px;">
-      Si tus columnas tienen otros nombres, renómbralas en el CSV o dime cuáles son y te ajusto el HTML.
+    <div class="row">
+      <button id="btnReset" type="button">Limpiar todo</button>
+      <button id="btnExportJSON" type="button" disabled>Exportar reporte JSON</button>
+      <button id="btnExportCSV" type="button" disabled>Exportar ER CSV</button>
     </div>
   </div>
 
+  <div class="grid topgrid" style="margin-top:14px;">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div class="row">
+          <span class="pill"><b>Privado:</b> no se sube nada</span>
+          <span class="pill">Acepta múltiples archivos</span>
+          <span class="pill">Separador auto (, o ;)</span>
+        </div>
+        <div class="row">
+          <button id="btnCalc" class="primary" type="button">Recalcular</button>
+        </div>
+      </div>
+      <div id="msg" class="muted" style="margin-top:10px;">Carga archivos y presiona “Recalcular”.</div>
+      <div class="small" style="margin-top:8px;">
+        Si algún CSV viene con columnas distintas, edítalo para que coincida con los nombres sugeridos, o usa sinónimos (ej: <code>unidad</code> por <code>unidad_negocio</code>).
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title" style="margin-top:0;">Selecciona Unidad de Negocio</div>
+      <div class="row">
+        <select id="selUnidad" style="min-width:260px;">
+          <option value="">(Primero carga datos)</option>
+        </select>
+        <span class="muted">Esto controla la vista “Por Unidad”.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:12px;">
+    <div class="card">
+      <div class="title" style="margin-top:0;">1) Horas (RRHH)</div>
+      <div class="row">
+        <input id="inHoras" type="file" multiple accept=".csv,text/csv" />
+        <span class="muted">Columnas: <code>unidad_negocio</code>, <code>area</code>, <code>persona</code>, <code>horas</code>, <code>valor_acordado</code></span>
+      </div>
+      <ul id="listHoras" class="filelist"></ul>
+    </div>
+
+    <div class="card">
+      <div class="title" style="margin-top:0;">2) Boletas de honorarios</div>
+      <div class="row">
+        <input id="inBoletas" type="file" multiple accept=".csv,text/csv" />
+        <span class="muted">Columnas: <code>unidad_negocio</code>, <code>nombre</code>, <code>numero_boleta</code>, <code>monto_neto</code></span>
+      </div>
+      <ul id="listBoletas" class="filelist"></ul>
+    </div>
+
+    <div class="card">
+      <div class="title" style="margin-top:0;">3) Facturas</div>
+      <div class="row">
+        <input id="inFacturas" type="file" multiple accept=".csv,text/csv" />
+        <span class="muted">Columnas: <code>unidad_negocio</code>, <code>razon_social</code>, <code>numero_factura</code>, <code>monto_neto</code></span>
+      </div>
+      <ul id="listFacturas" class="filelist"></ul>
+    </div>
+
+    <div class="card">
+      <div class="title" style="margin-top:0;">4) Ventas</div>
+      <div class="row">
+        <input id="inVentas" type="file" multiple accept=".csv,text/csv" />
+        <span class="muted">Columnas: <code>unidad_negocio</code>, <code>ventas_netas</code></span>
+      </div>
+      <ul id="listVentas" class="filelist"></ul>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="overview">Resumen</button>
+    <button class="tab" data-tab="unidad">Por Unidad</button>
+    <button class="tab" data-tab="datos">Datos (conteos)</button>
+  </div>
+
+  <div id="view-overview">
+    <div class="kpis">
+      <div class="card kpi"><div class="name">Ventas</div><div class="val" id="kVentas">—</div></div>
+      <div class="card kpi"><div class="name">Costos Horas</div><div class="val" id="kHoras">—</div></div>
+      <div class="card kpi"><div class="name">Honorarios</div><div class="val" id="kBoletas">—</div></div>
+      <div class="card kpi"><div class="name">Facturas</div><div class="val" id="kFacturas">—</div></div>
+    </div>
+
+    <div class="title">Estado de resultados (por Unidad)</div>
+    <div id="tblER"></div>
+
+    <div class="title">Costos por Área (Horas)</div>
+    <div id="tblHorasArea"></div>
+  </div>
+
+  <div id="view-unidad" style="display:none;">
+    <div class="title">Estado de resultados (Unidad seleccionada)</div>
+    <div id="tblERUnidad"></div>
+
+    <div class="title">Detalle Horas por Área</div>
+    <div id="tblUHoras"></div>
+
+    <div class="title">Detalle Honorarios por Persona</div>
+    <div id="tblUBoletas"></div>
+
+    <div class="title">Detalle Facturas por Proveedor</div>
+    <div id="tblUFacturas"></div>
+
+    <div class="title">Ventas</div>
+    <div id="tblUVentas"></div>
+  </div>
+
+  <div id="view-datos" style="display:none;">
+    <div class="card">
+      <div class="title" style="margin-top:0;">Conteos cargados</div>
+      <div id="counts" class="muted"></div>
+      <div class="small" style="margin-top:10px;">
+        Consejo: usa CSV con encabezados en la primera línea. El separador se detecta (coma o punto y coma).
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
-  const $ = (id) => document.getElementById(id);
+  // -------------------------
+  // Utilidades
+  // -------------------------
+  const $ = (id)=>document.getElementById(id);
 
-  const fileInput = $("file");
-  const delimSel = $("delim");
-  const msg = $("msg");
-
-  const kpiCount = $("kpiCount");
-  const kpiIn = $("kpiIn");
-  const kpiOut = $("kpiOut");
-  const kpiNet = $("kpiNet");
-
-  const monthlyWrap = $("monthlyWrap");
-  const catWrap = $("catWrap");
-  const previewWrap = $("previewWrap");
-
-  const btnJSON = $("btnJSON");
-  const btnCSV = $("btnCSV");
-  const btnSample = $("btnSample");
-
-  let lastReport = null;
-
-  function setMsg(text, kind="muted"){
-    msg.className = kind;
-    msg.textContent = text;
-  }
+  const money = (n)=>{
+    try { return new Intl.NumberFormat("es-CL",{maximumFractionDigits:0}).format(n); }
+    catch { return String(Math.round(n)); }
+  };
+  const num = (x)=>{
+    if (x==null) return 0;
+    let s = String(x).trim().replace(/\s/g,"").replace(/[^\d,.\-+]/g,"");
+    const hasC = s.includes(","), hasD = s.includes(".");
+    if (hasC && hasD) s = s.replace(/\./g,"").replace(",",".");
+    else if (hasC && !hasD) s = s.replace(",",".");
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const norm = (k)=>String(k||"").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[\s\-]/g,"_");
 
   function detectDelimiter(firstLine){
-    const comma = (firstLine.match(/,/g) || []).length;
-    const semi = (firstLine.match(/;/g) || []).length;
-    const tab = (firstLine.match(/\t/g) || []).length;
-    if (tab > comma && tab > semi) return "\t";
-    if (semi > comma) return ";";
+    const comma=(firstLine.match(/,/g)||[]).length;
+    const semi =(firstLine.match(/;/g)||[]).length;
+    const tab  =(firstLine.match(/\t/g)||[]).length;
+    if (tab>comma && tab>semi) return "\t";
+    if (semi>comma) return ";";
     return ",";
   }
 
-  // CSV parser simple con soporte de comillas dobles.
+  // Parser CSV simple con comillas y escape ""
   function parseCSV(text, delimiter){
-    const rows = [];
-    let row = [];
-    let cur = "";
-    let inQuotes = false;
-
-    for (let i=0; i<text.length; i++){
-      const c = text[i];
-      const next = text[i+1];
-
-      if (c === '"'){
-        if (inQuotes && next === '"'){ // escape ""
-          cur += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
+    const rows=[]; let row=[]; let cur=""; let inQ=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i], n=text[i+1];
+      if(c === '"'){
+        if(inQ && n === '"'){ cur+='"'; i++; }
+        else inQ=!inQ;
         continue;
       }
-
-      if (!inQuotes && c === delimiter){
-        row.push(cur);
-        cur = "";
-        continue;
+      if(!inQ && c === delimiter){ row.push(cur); cur=""; continue; }
+      if(!inQ && (c === "\n" || c === "\r")){
+        if(c === "\r" && n === "\n") i++;
+        row.push(cur); cur="";
+        if(row.length>1 || (row[0]||"").trim()!=="") rows.push(row);
+        row=[]; continue;
       }
-
-      if (!inQuotes && (c === "\n" || c === "\r")){
-        if (c === "\r" && next === "\n") i++; // CRLF
-        row.push(cur);
-        cur = "";
-        // evita filas vacías al final
-        if (row.length > 1 || (row.length === 1 && row[0].trim() !== "")) rows.push(row);
-        row = [];
-        continue;
-      }
-
       cur += c;
     }
-
-    // último campo
     row.push(cur);
-    if (row.length > 1 || (row.length === 1 && row[0].trim() !== "")) rows.push(row);
-
+    if(row.length>1 || (row[0]||"").trim()!=="") rows.push(row);
     return rows;
   }
 
-  function normalizeKey(k){
-    return String(k || "").trim().toLowerCase()
-      .normalize("NFD").replace(/\p{Diacritic}/gu, ""); // quita tildes
-  }
-
-  function parseMonto(x){
-    if (x == null) return 0;
-    let s = String(x).trim();
-
-    // elimina símbolos comunes
-    s = s.replace(/\s/g, "").replace(/[^\d,.\-+]/g, "");
-
-    // Heurística:
-    // - Si tiene coma y punto: asume "." miles y "," decimal -> quita puntos, cambia coma a punto.
-    // - Si solo tiene coma: asume coma decimal -> cambia a punto.
-    const hasComma = s.includes(",");
-    const hasDot = s.includes(".");
-    if (hasComma && hasDot){
-      s = s.replace(/\./g, "").replace(",", ".");
-    } else if (hasComma && !hasDot){
-      s = s.replace(",", ".");
-    }
-
-    const n = Number(s);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function parseDateISO(d){
-    const s = String(d || "").trim();
-    // acepta YYYY-MM-DD o YYYY/MM/DD
-    const cleaned = s.replace(/\//g, "-");
-    const m = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return null;
-    const y = Number(m[1]), mo = Number(m[2]), da = Number(m[3]);
-    const dt = new Date(Date.UTC(y, mo-1, da));
-    return Number.isFinite(dt.getTime()) ? dt : null;
-  }
-
-  function money(n){
-    // formato "es-CL" para que se vea bien en Mac (puedes cambiarlo)
-    try {
-      return new Intl.NumberFormat("es-CL", { maximumFractionDigits: 2 }).format(n);
-    } catch {
-      return (Math.round(n*100)/100).toFixed(2);
-    }
+  function mapHeaders(headers){
+    // sinónimos -> clave canonical
+    const h = headers.map(norm);
+    const idxOf = (...names)=>{
+      for(const nm of names){
+        const i = h.indexOf(norm(nm));
+        if(i!==-1) return i;
+      }
+      return -1;
+    };
+    return { h, idxOf };
   }
 
   function renderTable(container, headers, rows){
-    const thead = `<thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>`;
-    const tbody = `<tbody>${rows.map(r => `<tr>${r.map((cell, j) => {
-      const isNum = typeof cell === "number";
-      return `<td class="${isNum ? "num" : ""}">${isNum ? money(cell) : escapeHtml(String(cell))}</td>`;
+    const esc = (s)=>String(s).replace(/[&<>"']/g,c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    const thead = `<thead><tr>${headers.map(x=>`<th>${esc(x)}</th>`).join("")}</tr></thead>`;
+    const tbody = `<tbody>${rows.map(r=>`<tr>${r.map(v=>{
+      const isNum = typeof v === "number";
+      return `<td class="${isNum?'num':''}">${isNum?money(v):esc(v)}</td>`;
     }).join("")}</tr>`).join("")}</tbody>`;
     container.innerHTML = `<table>${thead}${tbody}</table>`;
   }
 
-  function escapeHtml(s){
-    return s.replace(/[&<>"']/g, (c) => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-    }[c]));
-  }
-
-  function buildReport(records){
-    // calcula KPIs
-    let ingresos = 0, gastos = 0, neto = 0;
-    const byMonth = new Map();
-    const byCat = new Map();
-
-    for (const r of records){
-      const amt = r.monto;
-      neto += amt;
-      if (amt >= 0) ingresos += amt;
-      else gastos += amt;
-
-      const month = r.fechaMonth ?? "Sin fecha";
-      byMonth.set(month, (byMonth.get(month) || 0) + amt);
-
-      const cat = r.categoria || "Sin categoría";
-      byCat.set(cat, (byCat.get(cat) || 0) + amt);
-    }
-
-    const monthlyRows = [...byMonth.entries()]
-      .sort((a,b) => a[0].localeCompare(b[0]))
-      .map(([m, total]) => [m, total]);
-
-    const catRows = [...byCat.entries()]
-      .sort((a,b) => Math.abs(b[1]) - Math.abs(a[1]))
-      .map(([c, total]) => [c, total]);
-
-    return {
-      count: records.length,
-      ingresos, gastos, neto,
-      monthly: monthlyRows,
-      categories: catRows,
-      preview: records.slice(0, 20)
-    };
-  }
-
-  function toRecords(rows){
-    if (!rows.length) return [];
-    const headers = rows[0].map(h => normalizeKey(h));
-    const idx = (name) => headers.indexOf(normalizeKey(name));
-
-    const iFecha = idx("fecha");
-    const iDesc = idx("descripcion");
-    const iCat = idx("categoria");
-    const iCuenta = idx("cuenta");
-    const iMonto = idx("monto");
-    const iMoneda = idx("moneda");
-
-    if (iMonto === -1){
-      throw new Error("No encontré la columna 'monto' en el encabezado.");
-    }
-
-    const recs = [];
-    for (let r=1; r<rows.length; r++){
-      const row = rows[r];
-      const rawFecha = iFecha !== -1 ? row[iFecha] : "";
-      const dt = parseDateISO(rawFecha);
-      const month = dt ? `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,"0")}` : "Sin fecha";
-
-      recs.push({
-        fecha: rawFecha || "",
-        fechaMonth: month,
-        descripcion: iDesc !== -1 ? (row[iDesc] || "") : "",
-        categoria: iCat !== -1 ? (row[iCat] || "").trim() : "Sin categoría",
-        cuenta: iCuenta !== -1 ? (row[iCuenta] || "").trim() : "",
-        monto: parseMonto(row[iMonto]),
-        moneda: iMoneda !== -1 ? (row[iMoneda] || "").trim() : ""
-      });
-    }
-    return recs;
-  }
-
-  function downloadText(filename, content, mime="text/plain"){
-    const blob = new Blob([content], { type: mime });
+  function downloadText(filename, content, mime){
+    const blob = new Blob([content], {type:mime});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url), 500);
+    a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 600);
   }
 
-  function reportToCSV(report){
-    const lines = [];
-    lines.push(["tipo","item","total"].join(","));
-    lines.push(["kpi","Ingresos",report.ingresos].join(","));
-    lines.push(["kpi","Gastos",report.gastos].join(","));
-    lines.push(["kpi","Neto",report.neto].join(","));
-    for (const [m, t] of report.monthly){
-      lines.push(["mes", m, t].join(","));
-    }
-    for (const [c, t] of report.categories){
-      // protege comas
-      const safe = `"${String(c).replace(/"/g,'""')}"`;
-      lines.push(["categoria", safe, t].join(","));
-    }
-    return lines.join("\n");
-  }
+  // -------------------------
+  // Estado de datos
+  // -------------------------
+  let data = {
+    horas: [],     // {unidad, area, persona, horas, valor, costo}
+    boletas: [],   // {unidad, nombre, numero, neto}
+    facturas: [],  // {unidad, proveedor, numero, neto}
+    ventas: []     // {unidad, ventas}
+  };
 
-  function render(report){
-    kpiCount.textContent = String(report.count);
-    kpiIn.textContent = money(report.ingresos);
-    kpiOut.textContent = money(report.gastos);
-    kpiNet.textContent = money(report.neto);
+  let report = null; // calculado
 
-    const monthlyDiv = document.createElement("div");
-    renderTable(monthlyDiv, ["Mes", "Total"], report.monthly);
+  // -------------------------
+  // Lectura de archivos por categoría
+  // -------------------------
+  async function readFiles(fileList, category){
+    const files = Array.from(fileList || []);
+    const all = [];
+    for(const f of files){
+      const text = await f.text();
+      const first = (text.split(/\r\n|\n|\r/)[0] || "");
+      const delim = detectDelimiter(first);
+      const rows = parseCSV(text, delim);
+      if(!rows.length) continue;
 
-    const catDiv = document.createElement("div");
-    renderTable(catDiv, ["Categoría", "Total"], report.categories);
+      const headers = rows[0];
+      const { idxOf } = mapHeaders(headers);
 
-    const prevDiv = document.createElement("div");
-    const prevRows = report.preview.map(r => [r.fecha, r.descripcion, r.categoria, r.cuenta, r.monto, r.moneda]);
-    renderTable(prevDiv, ["Fecha", "Descripción", "Categoría", "Cuenta", "Monto", "Moneda"], prevRows);
-
-    monthlyWrap.innerHTML = "";
-    monthlyWrap.appendChild(monthlyDiv);
-
-    catWrap.innerHTML = "";
-    catWrap.appendChild(catDiv);
-
-    previewWrap.innerHTML = "";
-    previewWrap.appendChild(prevDiv);
-  }
-
-  function handleFile(file){
-    const reader = new FileReader();
-    reader.onload = () => {
-      try{
-        const text = String(reader.result || "");
-        const firstLine = text.split(/\r\n|\n|\r/)[0] || "";
-        const chosen = delimSel.value === "auto" ? detectDelimiter(firstLine) : delimSel.value;
-
-        const rows = parseCSV(text, chosen);
-        const recs = toRecords(rows);
-        if (!recs.length) throw new Error("No hay datos (solo encabezado o archivo vacío).");
-
-        lastReport = buildReport(recs);
-        render(lastReport);
-
-        btnJSON.disabled = false;
-        btnCSV.disabled = false;
-
-        setMsg(`Listo: leí ${lastReport.count} movimientos usando separador ${chosen === "\t" ? "TAB" : "'" + chosen + "'"}.`);
-      } catch (e){
-        lastReport = null;
-        btnJSON.disabled = true;
-        btnCSV.disabled = true;
-        monthlyWrap.innerHTML = "";
-        catWrap.innerHTML = "";
-        previewWrap.innerHTML = "";
-        setMsg(e.message || "Error leyendo el CSV.", "error");
+      if(category === "horas"){
+        const iU = idxOf("unidad_negocio","unidad","local","unidad_de_negocio");
+        const iA = idxOf("area","área");
+        const iP = idxOf("persona","nombre","trabajador","colaborador");
+        const iH = idxOf("horas","hrs","hh");
+        const iV = idxOf("valor_acordado","valor_hora","tarifa","valor");
+        if(iU===-1 || iA===-1 || iP===-1 || iH===-1 || iV===-1){
+          throw new Error(`Horas: faltan columnas. Necesitas unidad_negocio, area, persona, horas, valor_acordado (en: ${f.name}).`);
+        }
+        for(let r=1;r<rows.length;r++){
+          const row = rows[r];
+          const unidad = (row[iU]||"").trim();
+          const area = (row[iA]||"").trim();
+          const persona = (row[iP]||"").trim();
+          const horas = num(row[iH]);
+          const valor = num(row[iV]);
+          all.push({unidad, area, persona, horas, valor, costo: horas*valor});
+        }
       }
-    };
-    reader.onerror = () => setMsg("No pude leer el archivo.", "error");
-    reader.readAsText(file, "utf-8");
+
+      if(category === "boletas"){
+        const iU = idxOf("unidad_negocio","unidad","local","unidad_de_negocio");
+        const iN = idxOf("nombre","persona","proveedor");
+        const iF = idxOf("numero_boleta","n_boleta","folio","numero","nro_boleta");
+        const iM = idxOf("monto_neto","neto","monto","monto_liquido");
+        if(iU===-1 || iN===-1 || iF===-1 || iM===-1){
+          throw new Error(`Boletas: faltan columnas. Necesitas unidad_negocio, nombre, numero_boleta, monto_neto (en: ${f.name}).`);
+        }
+        for(let r=1;r<rows.length;r++){
+          const row = rows[r];
+          all.push({
+            unidad:(row[iU]||"").trim(),
+            nombre:(row[iN]||"").trim(),
+            numero:(row[iF]||"").trim(),
+            neto:num(row[iM])
+          });
+        }
+      }
+
+      if(category === "facturas"){
+        const iU = idxOf("unidad_negocio","unidad","local","unidad_de_negocio");
+        const iR = idxOf("razon_social","razon","proveedor","empresa");
+        const iF = idxOf("numero_factura","n_factura","folio","numero","nro_factura");
+        const iM = idxOf("monto_neto","neto","monto","monto_liquido","total_neto");
+        if(iU===-1 || iR===-1 || iF===-1 || iM===-1){
+          throw new Error(`Facturas: faltan columnas. Necesitas unidad_negocio, razon_social, numero_factura, monto_neto (en: ${f.name}).`);
+        }
+        for(let r=1;r<rows.length;r++){
+          const row = rows[r];
+          all.push({
+            unidad:(row[iU]||"").trim(),
+            proveedor:(row[iR]||"").trim(),
+            numero:(row[iF]||"").trim(),
+            neto:num(row[iM])
+          });
+        }
+      }
+
+      if(category === "ventas"){
+        const iU = idxOf("unidad_negocio","unidad","local","unidad_de_negocio");
+        const iV = idxOf("ventas_netas","ventas","monto_neto","monto","neto_ventas");
+        if(iU===-1 || iV===-1){
+          throw new Error(`Ventas: faltan columnas. Necesitas unidad_negocio y ventas_netas (en: ${f.name}).`);
+        }
+        for(let r=1;r<rows.length;r++){
+          const row = rows[r];
+          all.push({ unidad:(row[iU]||"").trim(), ventas:num(row[iV]) });
+        }
+      }
+    }
+    return all;
   }
 
-  fileInput.addEventListener("change", () => {
-    const f = fileInput.files && fileInput.files[0];
-    if (!f) return;
-    setMsg("Leyendo archivo...");
-    handleFile(f);
+  function setFileList(ul, files){
+    ul.innerHTML = "";
+    if(!files || !files.length) return;
+    for(const f of files){
+      const li = document.createElement("li");
+      li.textContent = f.name;
+      ul.appendChild(li);
+    }
+  }
+
+  // -------------------------
+  // Cálculo de reporte
+  // -------------------------
+  function calcReport(){
+    const units = new Set();
+    for(const r of data.horas) if(r.unidad) units.add(r.unidad);
+    for(const r of data.boletas) if(r.unidad) units.add(r.unidad);
+    for(const r of data.facturas) if(r.unidad) units.add(r.unidad);
+    for(const r of data.ventas) if(r.unidad) units.add(r.unidad);
+
+    const unitList = Array.from(units).sort((a,b)=>a.localeCompare(b,"es"));
+    const byUnit = new Map();
+
+    for(const u of unitList){
+      byUnit.set(u, {
+        unidad:u,
+        ventas:0,
+        costoHoras:0,
+        honorarios:0,
+        facturas:0,
+        // detalles
+        horasPorArea:new Map(),
+        boletasPorNombre:new Map(),
+        facturasPorProveedor:new Map()
+      });
+    }
+
+    for(const v of data.ventas){
+      const u = v.unidad || "SIN_UNIDAD";
+      if(!byUnit.has(u)) byUnit.set(u,{unidad:u,ventas:0,costoHoras:0,honorarios:0,facturas:0,horasPorArea:new Map(),boletasPorNombre:new Map(),facturasPorProveedor:new Map()});
+      byUnit.get(u).ventas += v.ventas;
+    }
+
+    for(const h of data.horas){
+      const u = h.unidad || "SIN_UNIDAD";
+      if(!byUnit.has(u)) byUnit.set(u,{unidad:u,ventas:0,costoHoras:0,honorarios:0,facturas:0,horasPorArea:new Map(),boletasPorNombre:new Map(),facturasPorProveedor:new Map()});
+      const obj = byUnit.get(u);
+      obj.costoHoras += h.costo;
+      const key = h.area || "Sin área";
+      obj.horasPorArea.set(key, (obj.horasPorArea.get(key)||0) + h.costo);
+    }
+
+    for(const b of data.boletas){
+      const u = b.unidad || "SIN_UNIDAD";
+      if(!byUnit.has(u)) byUnit.set(u,{unidad:u,ventas:0,costoHoras:0,honorarios:0,facturas:0,horasPorArea:new Map(),boletasPorNombre:new Map(),facturasPorProveedor:new Map()});
+      const obj = byUnit.get(u);
+      obj.honorarios += b.neto;
+      const key = b.nombre || "Sin nombre";
+      obj.boletasPorNombre.set(key, (obj.boletasPorNombre.get(key)||0) + b.neto);
+    }
+
+    for(const f of data.facturas){
+      const u = f.unidad || "SIN_UNIDAD";
+      if(!byUnit.has(u)) byUnit.set(u,{unidad:u,ventas:0,costoHoras:0,honorarios:0,facturas:0,horasPorArea:new Map(),boletasPorNombre:new Map(),facturasPorProveedor:new Map()});
+      const obj = byUnit.get(u);
+      obj.facturas += f.neto;
+      const key = f.proveedor || "Sin proveedor";
+      obj.facturasPorProveedor.set(key, (obj.facturasPorProveedor.get(key)||0) + f.neto);
+    }
+
+    // totales
+    let tVentas=0,tHoras=0,tBoletas=0,tFacturas=0;
+    for(const obj of byUnit.values()){
+      tVentas += obj.ventas;
+      tHoras += obj.costoHoras;
+      tBoletas += obj.honorarios;
+      tFacturas += obj.facturas;
+    }
+
+    return { unitList:Array.from(byUnit.keys()).sort((a,b)=>a.localeCompare(b,"es")), byUnit, totals:{tVentas,tHoras,tBoletas,tFacturas} };
+  }
+
+  function refreshUI(){
+    if(!report){
+      $("btnExportJSON").disabled = true;
+      $("btnExportCSV").disabled = true;
+      $("kVentas").textContent="—";
+      $("kHoras").textContent="—";
+      $("kBoletas").textContent="—";
+      $("kFacturas").textContent="—";
+      $("tblER").innerHTML="";
+      $("tblHorasArea").innerHTML="";
+      $("tblERUnidad").innerHTML="";
+      $("tblUHoras").innerHTML="";
+      $("tblUBoletas").innerHTML="";
+      $("tblUFacturas").innerHTML="";
+      $("tblUVentas").innerHTML="";
+      $("counts").textContent = "";
+      return;
+    }
+
+    $("btnExportJSON").disabled = false;
+    $("btnExportCSV").disabled = false;
+
+    $("kVentas").textContent = money(report.totals.tVentas);
+    $("kHoras").textContent = money(report.totals.tHoras);
+    $("kBoletas").textContent = money(report.totals.tBoletas);
+    $("kFacturas").textContent = money(report.totals.tFacturas);
+
+    // Tabla ER por unidad
+    const erRows = report.unitList.map(u=>{
+      const o = report.byUnit.get(u);
+      const costos = o.costoHoras + o.honorarios + o.facturas;
+      const resultado = o.ventas - costos;
+      return [u, o.ventas, o.costoHoras, o.honorarios, o.facturas, costos, resultado];
+    });
+    const erDiv = document.createElement("div");
+    renderTable(erDiv,
+      ["Unidad","Ventas","Costos Horas","Honorarios","Facturas","Total Costos","Resultado"],
+      erRows
+    );
+    $("tblER").innerHTML=""; $("tblER").appendChild(erDiv);
+
+    // Horas por área (global)
+    const globalArea = new Map();
+    for(const u of report.unitList){
+      const o = report.byUnit.get(u);
+      for(const [area,val] of o.horasPorArea.entries()){
+        globalArea.set(area, (globalArea.get(area)||0) + val);
+      }
+    }
+    const areaRows = Array.from(globalArea.entries()).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).map(([a,v])=>[a,v]);
+    const areaDiv = document.createElement("div");
+    renderTable(areaDiv, ["Área","Costos Horas"], areaRows);
+    $("tblHorasArea").innerHTML=""; $("tblHorasArea").appendChild(areaDiv);
+
+    // Selector de unidad
+    const sel = $("selUnidad");
+    const current = sel.value;
+    sel.innerHTML = "";
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "(Selecciona una unidad)";
+    sel.appendChild(opt0);
+    for(const u of report.unitList){
+      const op = document.createElement("option");
+      op.value = u;
+      op.textContent = u;
+      sel.appendChild(op);
+    }
+    sel.value = report.unitList.includes(current) ? current : "";
+
+    // Conteos
+    $("counts").innerHTML = `
+      <div>Horas: <b>${data.horas.length}</b></div>
+      <div>Boletas: <b>${data.boletas.length}</b></div>
+      <div>Facturas: <b>${data.facturas.length}</b></div>
+      <div>Ventas: <b>${data.ventas.length}</b></div>
+      <div>Unidades detectadas: <b>${report.unitList.length}</b></div>
+    `;
+
+    refreshUnidadView();
+  }
+
+  function refreshUnidadView(){
+    const u = $("selUnidad").value;
+    if(!report || !u || !report.byUnit.has(u)){
+      $("tblERUnidad").innerHTML = `<div class="muted">Selecciona una unidad arriba.</div>`;
+      $("tblUHoras").innerHTML = "";
+      $("tblUBoletas").innerHTML = "";
+      $("tblUFacturas").innerHTML = "";
+      $("tblUVentas").innerHTML = "";
+      return;
+    }
+    const o = report.byUnit.get(u);
+    const costos = o.costoHoras + o.honorarios + o.facturas;
+    const resultado = o.ventas - costos;
+
+    // ER unidad
+    const er1 = document.createElement("div");
+    renderTable(er1,
+      ["Unidad","Ventas","Costos Horas","Honorarios","Facturas","Total Costos","Resultado"],
+      [[u, o.ventas, o.costoHoras, o.honorarios, o.facturas, costos, resultado]]
+    );
+    $("tblERUnidad").innerHTML=""; $("tblERUnidad").appendChild(er1);
+
+    // Horas por área
+    const horasRows = Array.from(o.horasPorArea.entries()).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).map(([a,v])=>[a,v]);
+    const hDiv = document.createElement("div");
+    renderTable(hDiv, ["Área","Costos Horas"], horasRows);
+    $("tblUHoras").innerHTML=""; $("tblUHoras").appendChild(hDiv);
+
+    // Boletas por nombre
+    const bRows = Array.from(o.boletasPorNombre.entries()).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).map(([n,v])=>[n,v]);
+    const bDiv = document.createElement("div");
+    renderTable(bDiv, ["Persona","Monto neto"], bRows);
+    $("tblUBoletas").innerHTML=""; $("tblUBoletas").appendChild(bDiv);
+
+    // Facturas por proveedor
+    const fRows = Array.from(o.facturasPorProveedor.entries()).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).map(([p,v])=>[p,v]);
+    const fDiv = document.createElement("div");
+    renderTable(fDiv, ["Proveedor","Monto neto"], fRows);
+    $("tblUFacturas").innerHTML=""; $("tblUFacturas").appendChild(fDiv);
+
+    // Ventas (solo total por unidad en este modelo)
+    const vDiv = document.createElement("div");
+    renderTable(vDiv, ["Unidad","Ventas"], [[u, o.ventas]]);
+    $("tblUVentas").innerHTML=""; $("tblUVentas").appendChild(vDiv);
+  }
+
+  // -------------------------
+  // Tabs
+  // -------------------------
+  function setTab(name){
+    const map = {overview:"view-overview", unidad:"view-unidad", datos:"view-datos"};
+    for(const k of Object.keys(map)){
+      $(map[k]).style.display = (k===name) ? "" : "none";
+    }
+    document.querySelectorAll(".tab").forEach(btn=>{
+      btn.classList.toggle("active", btn.dataset.tab===name);
+    });
+  }
+  document.querySelectorAll(".tab").forEach(btn=>{
+    btn.addEventListener("click", ()=>setTab(btn.dataset.tab));
   });
 
-  delimSel.addEventListener("change", () => {
-    const f = fileInput.files && fileInput.files[0];
-    if (!f) return;
-    setMsg("Reprocesando con el nuevo separador...");
-    handleFile(f);
+  // -------------------------
+  // Eventos de carga
+  // -------------------------
+  $("inHoras").addEventListener("change", async (e)=>{
+    const files = e.target.files;
+    setFileList($("listHoras"), Array.from(files||[]));
+    try{
+      data.horas = await readFiles(files, "horas");
+      $("msg").className="muted";
+      $("msg").textContent = `Horas: cargadas ${data.horas.length} filas.`;
+    } catch(err){
+      $("msg").className="err";
+      $("msg").textContent = String(err.message || err);
+      data.horas = [];
+    }
   });
 
-  btnJSON.addEventListener("click", () => {
-    if (!lastReport) return;
-    downloadText("reporte.json", JSON.stringify(lastReport, null, 2), "application/json");
+  $("inBoletas").addEventListener("change", async (e)=>{
+    const files = e.target.files;
+    setFileList($("listBoletas"), Array.from(files||[]));
+    try{
+      data.boletas = await readFiles(files, "boletas");
+      $("msg").className="muted";
+      $("msg").textContent = `Boletas: cargadas ${data.boletas.length} filas.`;
+    } catch(err){
+      $("msg").className="err";
+      $("msg").textContent = String(err.message || err);
+      data.boletas = [];
+    }
   });
 
-  btnCSV.addEventListener("click", () => {
-    if (!lastReport) return;
-    downloadText("resumen_reporte.csv", reportToCSV(lastReport), "text/csv");
+  $("inFacturas").addEventListener("change", async (e)=>{
+    const files = e.target.files;
+    setFileList($("listFacturas"), Array.from(files||[]));
+    try{
+      data.facturas = await readFiles(files, "facturas");
+      $("msg").className="muted";
+      $("msg").textContent = `Facturas: cargadas ${data.facturas.length} filas.`;
+    } catch(err){
+      $("msg").className="err";
+      $("msg").textContent = String(err.message || err);
+      data.facturas = [];
+    }
   });
 
-  btnSample.addEventListener("click", () => {
-    const sample =
-`fecha,descripcion,categoria,cuenta,monto,moneda
-2025-01-03,Sueldo,Ingresos,Banco,1200000,CLP
-2025-01-05,Supermercado,Alimentación,Tarjeta,-65000,CLP
-2025-01-07,Transporte,Transporte,Efectivo,-18000,CLP
-2025-01-10,Arriendo,Vivienda,Banco,-450000,CLP
-2025-01-12,Luz,Vivienda,Banco,-42000,CLP
-2025-01-15,Internet,Vivienda,Banco,-25000,CLP
-2025-01-18,Cine,Ocio,Tarjeta,-12000,CLP
-2025-01-20,Venta,Ingresos,Efectivo,35000,CLP
-2025-01-22,Restaurante,Comida fuera,Tarjeta,-22000,CLP
-2025-01-25,Ahorro,Ahorro,Banco,-100000,CLP
-2025-01-31,Interés,Ingresos,Banco,2500,CLP
-`;
-    downloadText("movimientos_ejemplo.csv", sample, "text/csv");
+  $("inVentas").addEventListener("change", async (e)=>{
+    const files = e.target.files;
+    setFileList($("listVentas"), Array.from(files||[]));
+    try{
+      data.ventas = await readFiles(files, "ventas");
+      $("msg").className="muted";
+      $("msg").textContent = `Ventas: cargadas ${data.ventas.length} filas.`;
+    } catch(err){
+      $("msg").className="err";
+      $("msg").textContent = String(err.message || err);
+      data.ventas = [];
+    }
   });
 
-  setMsg("Carga un CSV para generar el reporte.");
+  $("btnCalc").addEventListener("click", ()=>{
+    try{
+      report = calcReport();
+      refreshUI();
+      $("msg").className="muted";
+      $("msg").textContent = "Reporte recalculado ✅";
+    } catch(err){
+      report = null;
+      refreshUI();
+      $("msg").className="err";
+      $("msg").textContent = String(err.message || err);
+    }
+  });
+
+  $("selUnidad").addEventListener("change", refreshUnidadView);
+
+  $("btnReset").addEventListener("click", ()=>{
+    data = {horas:[],boletas:[],facturas:[],ventas:[]};
+    report = null;
+    $("inHoras").value=""; $("inBoletas").value=""; $("inFacturas").value=""; $("inVentas").value="";
+    $("listHoras").innerHTML=""; $("listBoletas").innerHTML=""; $("listFacturas").innerHTML=""; $("listVentas").innerHTML="";
+    $("msg").className="muted"; $("msg").textContent="Todo limpio. Carga archivos y presiona “Recalcular”.";
+    refreshUI();
+  });
+
+  $("btnExportJSON").addEventListener("click", ()=>{
+    if(!report) return;
+    const payload = {data, report:{
+      unitList: report.unitList,
+      totals: report.totals,
+      byUnit: Object.fromEntries(Array.from(report.byUnit.entries()).map(([k,v])=>[
+        k, {
+          unidad:v.unidad,
+          ventas:v.ventas,
+          costoHoras:v.costoHoras,
+          honorarios:v.honorarios,
+          facturas:v.facturas,
+          horasPorArea:Object.fromEntries(v.horasPorArea),
+          boletasPorNombre:Object.fromEntries(v.boletasPorNombre),
+          facturasPorProveedor:Object.fromEntries(v.facturasPorProveedor)
+        }
+      ]))
+    }};
+    downloadText("reporte.json", JSON.stringify(payload, null, 2), "application/json");
+  });
+
+  $("btnExportCSV").addEventListener("click", ()=>{
+    if(!report) return;
+    const lines = [];
+    lines.push(["unidad","ventas","costos_horas","honorarios","facturas","total_costos","resultado"].join(","));
+    for(const u of report.unitList){
+      const o = report.byUnit.get(u);
+      const total = o.costoHoras + o.honorarios + o.facturas;
+      const res = o.ventas - total;
+      lines.push([`"${u.replace(/"/g,'""')}"`, o.ventas, o.costoHoras, o.honorarios, o.facturas, total, res].join(","));
+    }
+    downloadText("estado_resultados.csv", lines.join("\n"), "text/csv");
+  });
+
+  // Estado inicial
+  refreshUI();
 })();
 </script>
 </body>
 </html>
+
