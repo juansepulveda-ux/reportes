@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ER por Unidad / Área - CSV (Horas, Boletas, Facturas, Ventas)</title>
+  <style>
+    :root{--b:#e5e7eb;--m:#6b7280;--bg:#f6f7fb;--ink:#111827;}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Arial,sans-serif;}
+    .wrap{max-width:1100px;margin:0 auto;padding:22px;}
+    h1{margin:0;font-size:20px;}
+    .sub{margin-top:6px;color:var(--m);line-height:1.45;font-size:13px;}
+    .grid{display:grid;gap:12px;}
+    .topgrid{grid-template-columns:1fr;}
+    @media(min-width:900px){.topgrid{grid-template-columns:1.15fr .85fr;}}
+    .card{background:#fff;border:1px solid var(--b);border-radius:16px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    input[type=file],button,select{border:1px solid var(--b);border-radius:12px;padding:10px 12px;background:#fff;font-size:14px;}
+    button{cursor:pointer}
+    button.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+    button:disabled{opacity:.55;cursor:not-allowed;}
+    .pill{display:inline-flex;gap:8px;align-items:center;padding:7px 10px;border:1px solid var(--b);border-radius:999px;background:#fff;color:var(--ink);font-size:12px;}
+    .muted{color:var(--m);font-size:13px;line-height:1.45;}
+    .err{color:#b91c1c;font-weight:900;}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;}
+    .tab{border:1px solid var(--b);border-radius:999px;padding:8px 12px;background:#fff;font-weight:900;font-size:13px;cursor:pointer;}
+    .tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+    .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+    @media(min-width:900px){.kpis{grid-template-columns:repeat(5,1fr);}}
+    .kpi .name{color:var(--m);font-size:12px;}
+    .kpi .val{font-size:18px;font-weight:950;margin-top:6px;font-variant-numeric:tabular-nums;}
+    .title{margin:16px 0 10px;font-size:14px;font-weight:950;}
+    table{width:100%;border-collapse:collapse;border:1px solid var(--b);border-radius:14px;overflow:hidden;background:#fff;}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--b);font-size:13px;}
+    th{background:#fafafa;text-align:left;font-weight:950;}
+    tr:last-child td{border-bottom:none;}
+    td.num{text-align:right;font-variant-numeric:tabular-nums;}
+    code{background:#f3f4f6;padding:2px 6px;border-radius:8px}
+    .filelist{margin:8px 0 0;padding-left:18px;color:var(--m);font-size:13px;}
+    details{border:1px solid var(--b);border-radius:14px;background:#fff;padding:10px 12px;}
+    summary{cursor:pointer;font-weight:950;}
+    .small{font-size:12px;color:var(--m);line-height:1.45;}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row" style="justify-content:space-between; align-items:flex-start;">
+    <div>
+      <h1>Estado de Resultados por Unidad y Área (CSV)</h1>
+      <div class="sub">
+        Sube múltiples CSV por categoría (Horas, Boletas, Facturas, Ventas).<br/>
+        <b>Privacidad:</b> todo se procesa en tu navegador; no se guardan archivos.
+      </div>
+    </div>
+    <div class="row">
+      <button id="btnLoadExamples" class="primary" type="button">Cargar CSV ejemplos</button>
+      <button id="btnDownloadExamples" type="button">Descargar CSV ejemplos</button>
+      <button id="btnReset" type="button">Limpiar</button>
+    </div>
+  </div>
+
+  <div class="grid topgrid" style="margin-top:14px;">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div class="row">
+          <span class="pill"><b>4 categorías</b></span>
+          <span class="pill">Múltiples archivos por categoría</span>
+          <span class="pill">Separador auto (, o ;)</span>
+        </div>
+        <div class="row">
+          <button id="btnCalc" class="primary" type="button">Recalcular</button>
+          <button id="btnExportER" type="button" disabled>Exportar ER (CSV)</button>
+          <button id="btnExportJSON" type="button" disabled>Exportar (JSON)</button>
+        </div>
+      </div>
+      <div id="msg" class="muted" style="margin-top:10px;">Carga archivos o usa “Cargar CSV ejemplos”. Luego presiona “Recalcular”.</div>
+      <div class="small" style="margin-top:8px;">
+        <b>Áreas:</b> Horas, Boletas y Facturas se agrupan por <code>unidad_negocio</code> + <code>area</code>.
+        Las ventas son por <code>unidad_negocio</code> (sin área).
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title" style="margin-top:0;">Unidad de Negocio</div>
+      <div class="row">
+        <select id="selUnidad" style="min-width:280px;">
+          <option value="">(Primero carga datos)</option>
+        </select>
+        <span class="muted">Controla la pestaña “Por unidad”.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:12px;">
+    <div class="card">
+      <div class="title" style="margin-top:0;">1) Horas (RRHH)</div>
+      <div class="row">
+        <input id="inHoras" type="file" multiple accept=".csv,text/csv" />
+        <span class="muted">Long: <code>unidad_negocio, area, persona, horas, valor_acordado</code></span>
+      </div>
+      <div class="small" style="margin-top:8px;">
+        También soporta <b>formato ancho</b>: columnas de personas con horas, más <code>unidad_negocio, area, valor_acordado</code>.
+      </div>
+      <ul id="listHoras" class="filelist"></ul>
+    </div>
+
+    <div class="card">
+      <div class="title" style="margin-top:0;">2) Boletas de honorarios (montos fijos)</div>
+      <div class="row">
+        <input id="inBoletas" type="file" multiple accept=".csv,text/csv" />
+        <span class="muted"><code>unidad_negocio, area, nombre, numero_boleta, monto_neto</code></span>
+      </div>
+      <ul id="listBoletas" class="filelist"></ul>
+    </div>
+
+    <div class="card">
+      <div class="title" style="margin-top:0;">3) Facturas</div>
+      <div class="row">
+        <input id="inFacturas" type="file" multiple accept=".csv,text/csv" />
+        <span class="muted"><code>unidad_negocio, area, razon_social, numero_factura, monto_neto</code></span>
+      </div>
+      <ul id="listFacturas" class="filelist"></ul>
+    </div>
+
+    <div class="card">
+      <div class="title" style="margin-top:0;">4) Ventas</div>
+      <div class="row">
+        <input id="inVentas" type="file" multiple accept=".csv,text/csv" />
+        <span class="muted"><code>unidad_negocio, ventas_netas</code></span>
+      </div>
+      <ul id="listVentas" class="filelist"></ul>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="overview">Resumen</button>
+    <button class="tab" data-tab="unidad">Por unidad</button>
+    <button class="tab" data-tab="horas">Horas (detalle)</button>
+    <button class="tab" data-tab="datos">Datos</button>
+  </div>
+
+  <div id="view-overview">
+    <div class="kpis">
+      <div class="card kpi"><div class="name">Ventas</div><div class="val" id="kVentas">—</div></div>
+      <div class="card kpi"><div class="name">Costos Horas</div><div class="val" id="kHoras">—</div></div>
+      <div class="card kpi"><div class="name">Honorarios</div><div class="val" id="kBoletas">—</div></div>
+      <div class="card kpi"><div class="name">Facturas</div><div class="val" id="kFacturas">—</div></div>
+      <div class="card kpi"><div class="name">Resultado</div><div class="val" id="kResultado">—</div></div>
+    </div>
+
+    <div class="title">Estado de resultados por Unidad</div>
+    <div id="tblER"></div>
+
+    <div class="title">Estado de resultados por Unidad & Área (costos + resultado acumulado)</div>
+    <div id="tblERAreas"></div>
+  </div>
+
+  <div id="view-unidad" style="display:none;">
+    <div class="title">ER unidad seleccionada</div>
+    <div id="tblERUnidad"></div>
+
+    <div class="title">Áreas de la unidad (costos y resultado acumulado)</div>
+    <div id="tblAreasUnidad"></div>
+
+    <div class="title">Detalles por área</div>
+    <div id="detailsAreasUnidad"></div>
+  </div>
+
+  <div id="view-horas" style="display:none;">
+    <div class="card">
+      <div class="title" style="margin-top:0;">Horas por unidad → área → persona</div>
+      <div class="muted">Se calcula <code>costo = horas * valor_acordado</code>.</div>
+      <div id="treeHoras" style="margin-top:12px;"></div>
+    </div>
+  </div>
+
+  <div id="view-datos" style="display:none;">
+    <div class="card">
+      <div class="title" style="margin-top:0;">Conteos cargados</div>
+      <div id="counts" class="muted"></div>
+      <div class="small" style="margin-top:10px;">
+        Si te falta <code>area</code> en boletas/facturas, se usa <b>“Sin área”</b>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const $ = (id)=>document.getElementById(id);
+
+  const money = (n)=>{
+    try { return new Intl.NumberFormat("es-CL",{maximumFractionDigits:0}).format(Math.round(n)); }
+    catch { return String(Math.round(n)); }
+  };
+
+  const num = (x)=>{
+    if (x==null) return 0;
+    let s = String(x).trim().replace(/\s/g,"").replace(/[^\d,.\-+]/g,"");
+    const hasC = s.includes(","), hasD = s.includes(".");
+    if (hasC && hasD) s = s.replace(/\./g,"").replace(",",".");
+    else if (hasC && !hasD) s = s.replace(",",".");
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const norm = (k)=>String(k||"").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[\s\-]/g,"_");
+
+  function detectDelimiter(firstLine){
+    const comma=(firstLine.match(/,/g)||[]).length;
+    const semi =(firstLine.match(/;/g)||[]).length;
+    const tab  =(firstLine.match(/\t/g)||[]).length;
+    if (tab>comma && tab>semi) return "\t";
+    if (semi>comma) return ";";
+    return ",";
+  }
+
+  function parseCSV(text, delimiter){
+    const rows=[]; let row=[]; let cur=""; let inQ=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i], n=text[i+1];
+      if(c === '"'){
+        if(inQ && n === '"'){ cur+='"'; i++; }
+        else inQ=!inQ;
+        continue;
+      }
+      if(!inQ && c === delimiter){ row.push(cur); cur=""; continue; }
+      if(!inQ && (c === "\n" || c === "\r")){
+        if(c === "\r" && n === "\n") i++;
+        row.push(cur); cur="";
+        if(row.length>1 || (row[0]||"").trim()!=="") rows.push(row);
+        row=[]; continue;
+      }
+      cur += c;
+    }
+    row.push(cur);
+    if(row.length>1 || (row[0]||"").trim()!=="") rows.push(row);
+    return rows;
+  }
+
+  function mapHeaders(headers){
+    const h = headers.map(norm);
+    const idxOf = (...names)=>{
+      for(const nm of names){
+        const i = h.indexOf(norm(nm));
+        if(i!==-1) return i;
+      }
+      return -1;
+    };
+    return { h, idxOf };
+  }
+
+  function renderTable(container, headers, rows){
+    const esc = (s)=>String(s).replace(/[&<>"']/g,c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    const thead = `<thead><tr>${headers.map(x=>`<th>${esc(x)}</th>`).join("")}</tr></thead>`;
+    const tbody = `<tbody>${rows.map(r=>`<tr>${r.map(v=>{
+      const isNum = typeof v === "number";
+      return `<td class="${isNum?'num':''}">${isNum?money(v):esc(v)}</td>`;
+    }).join("")}</tr>`).join("")}</tbody>`;
+    container.innerHTML = `<table>${thead}${tbody}</table>`;
+  }
+
+  function downloadText(filename, content, mime){
+    const blob = new Blob([content], {type:mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 600);
+  }
+
+  function setMsg(text, isErr=false){
+    $("msg").className = isErr ? "err" : "muted";
+    $("msg").textContent = text;
+  }
+
+  function setFileList(ul, files){
+    ul.innerHTML = "";
+    if(!files || !files.length) return;
+    for(const f of files){
+      const li = document.createElement("li");
+      li.textContent = f.name;
+      ul.appendChild(li);
+    }
+  }
+
+  let data = { horas:[], boletas:[], facturas:[], ventas:[] };
+  let report = null;
+
+  function parseCategoryFromText(text, category, filename="(texto)"){
+    const first = (text.split(/\r\n|\n|\r/)[0] || "");
+    const delim = detectDelimiter(first);
+    const rows = parseCSV(text, delim);
+    if(!rows.length) return [];
+
+    const headers = rows[0];
+    const { h, idxOf } = mapHeaders(headers);
+    const results = [];
+
+    if(category === "horas"){
+      const iU = idxOf("unidad_negocio","unidad","local","unidad_de_negocio");
+      const iA = idxOf("area","área");
+      const iP = idxOf("persona","nombre","trabajador","colaborador");
+      const iH = idxOf("horas","hrs","hh");
+      const iV = idxOf("valor_acordado","valor_hora","tarifa","valor");
+
+      if(iU===-1 || iA===-1 || iV===-1){
+        throw new Error(`Horas: faltan columnas mínimas (unidad_negocio, area, valor_acordado) en: ${filename}`);
+      }
+      const hasLong = (iP!==-1 && iH!==-1);
+
+      if(hasLong){
+        for(let r=1;r<rows.length;r++){
+          const row = rows[r];
+          const unidad = (row[iU]||"").trim();
+          const area = (row[iA]||"").trim() || "Sin área";
+          const persona = (row[iP]||"").trim() || "Sin nombre";
+          const horas = num(row[iH]);
+          const valor = num(row[iV]);
+          results.push({unidad, area, persona, horas, valor, costo: horas*valor});
+        }
+      } else {
+        const skipIdx = new Set([iU,iA,iV]);
+        const personCols = h.map((name, idx)=>({name, idx})).filter(x=>!skipIdx.has(x.idx));
+        if(personCols.length === 0){
+          throw new Error(`Horas: no encontré columnas de persona (formato ancho) en: ${filename}`);
+        }
+        for(let r=1;r<rows.length;r++){
+          const row = rows[r];
+          const unidad = (row[iU]||"").trim();
+          const area = (row[iA]||"").trim() || "Sin área";
+          const valor = num(row[iV]);
+          for(const pc of personCols){
+            const horas = num(row[pc.idx]);
+            if(!horas) continue;
+            const persona = pc.name.replace(/_/g," ").trim();
+            results.push({unidad, area, persona, horas, valor, costo: horas*valor});
+          }
+        }
+      }
+    }
+
+    if(category === "boletas"){
+      const iU = idxOf("unidad_negocio","unidad","local","unidad_de_negocio");
+      const iA = idxOf("area","área");
+      const iN = idxOf("nombre","persona","proveedor");
+      const iF = idxOf("numero_boleta","n_boleta","folio","numero","nro_boleta");
+      const iM = idxOf("monto_neto","neto","monto","monto_liquido");
+      if(iU===-1 || iN===-1 || iF===-1 || iM===-1){
+        throw new Error(`Boletas: faltan columnas (unidad_negocio, nombre, numero_boleta, monto_neto) en: ${filename}`);
+      }
+      for(let r=1;r<rows.length;r++){
+        const row = rows[r];
+        results.push({
+          unidad:(row[iU]||"").trim(),
+          area:(iA===-1 ? "Sin área" : ((row[iA]||"").trim() || "Sin área")),
+          nombre:(row[iN]||"").trim() || "Sin nombre",
+          numero:(row[iF]||"").trim(),
+          neto:num(row[iM])
+        });
+      }
+    }
+
+    if(category === "facturas"){
+      const iU = idxOf("unidad_negocio","unidad","local","unidad_de_negocio");
+      const iA = idxOf("area","área");
+      const iR = idxOf("razon_social","razon","proveedor","empresa");
+      const iF = idxOf("numero_factura","n_factura","folio","numero","nro_factura");
+      const iM = idxOf("monto_neto","neto","monto","monto_liquido","total_neto");
+      if(iU===-1 || iR===-1 || iF===-1 || iM===-1){
+        throw new Error(`Facturas: faltan columnas (unidad_negocio, razon_social, numero_factura, monto_neto) en: ${filename}`);
+      }
+      for(let r=1;r<rows.length;r++){
+        const row = rows[r];
+        results.push({
+          unidad:(row[iU]||"").trim(),
+          area:(iA===-1 ? "Sin área" : ((row[iA]||"").trim() || "Sin área")),
+          proveedor:(row[iR]||"").trim() || "Sin proveedor",
+          numero:(row[iF]||"").trim(),
+          neto:num(row[iM])
+        });
+      }
+    }
+
+    if(category === "ventas"){
+      const iU = idxOf("unidad_negocio","unidad","local","unidad_de_negocio");
+      const iV = idxOf("ventas_netas","ventas","monto_neto","monto","neto_ventas");
+      if(iU===-1 || iV===-1){
+        throw new Error(`Ventas: faltan columnas (unidad_negocio, ventas_netas) en: ${filename}`);
+      }
+      for(let r=1;r<rows.length;r++){
+        const row = rows[r];
+        results.push({ unidad:(row[iU]||"").trim(), ventas:num(row[iV]) });
+      }
+    }
+
+    return results;
+  }
+
+  async function readFiles(fileList, category){
+    const files = Array.from(fileList || []);
+    const all = [];
+    for(const f of files){
+      const text = await f.text();
+      const part = parseCategoryFromText(text, category, f.name);
+      for(const x of part) all.push(x);
+    }
+    return all;
+  }
+
+  function calcReport(){
+    const units = new Set();
+    for(const r of data.horas) if(r.unidad) units.add(r.unidad);
+    for(const r of data.boletas) if(r.unidad) units.add(r.unidad);
+    for(const r of data.facturas) if(r.unidad) units.add(r.unidad);
+    for(const r of data.ventas) if(r.unidad) units.add(r.unidad);
+
+    const byUnit = new Map();
+
+    function ensureUnit(u){
+      if(!byUnit.has(u)){
+        byUnit.set(u, {
+          unidad:u,
+          ventas:0,
+          costoHoras:0,
+          honorarios:0,
+          facturas:0,
+          byArea:new Map(),
+          horasAreaPersona:new Map(),
+          boletasAreaNombre:new Map(),
+          facturasAreaProveedor:new Map(),
+        });
+      }
+      return byUnit.get(u);
+    }
+    function ensureArea(unitObj, area){
+      const a = area || "Sin área";
+      if(!unitObj.byArea.has(a)){
+        unitObj.byArea.set(a, {area:a, costoHoras:0, honorarios:0, facturas:0});
+      }
+      return unitObj.byArea.get(a);
+    }
+
+    for(const v of data.ventas){
+      const o = ensureUnit(v.unidad || "SIN_UNIDAD");
+      o.ventas += v.ventas;
+    }
+
+    for(const h of data.horas){
+      const o = ensureUnit(h.unidad || "SIN_UNIDAD");
+      const aObj = ensureArea(o, h.area || "Sin área");
+      o.costoHoras += h.costo;
+      aObj.costoHoras += h.costo;
+
+      const area = h.area || "Sin área";
+      if(!o.horasAreaPersona.has(area)) o.horasAreaPersona.set(area, new Map());
+      const mp = o.horasAreaPersona.get(area);
+      if(!mp.has(h.persona)) mp.set(h.persona, {persona:h.persona, horas:0, costo:0});
+      const p = mp.get(h.persona);
+      p.horas += h.horas;
+      p.costo += h.costo;
+    }
+
+    for(const b of data.boletas){
+      const o = ensureUnit(b.unidad || "SIN_UNIDAD");
+      const aObj = ensureArea(o, b.area || "Sin área");
+      o.honorarios += b.neto;
+      aObj.honorarios += b.neto;
+
+      const area = b.area || "Sin área";
+      if(!o.boletasAreaNombre.has(area)) o.boletasAreaNombre.set(area, new Map());
+      const mp = o.boletasAreaNombre.get(area);
+      mp.set(b.nombre, (mp.get(b.nombre)||0) + b.neto);
+    }
+
+    for(const f of data.facturas){
+      const o = ensureUnit(f.unidad || "SIN_UNIDAD");
+      const aObj = ensureArea(o, f.area || "Sin área");
+      o.facturas += f.neto;
+      aObj.facturas += f.neto;
+
+      const area = f.area || "Sin área";
+      if(!o.facturasAreaProveedor.has(area)) o.facturasAreaProveedor.set(area, new Map());
+      const mp = o.facturasAreaProveedor.get(area);
+      mp.set(f.proveedor, (mp.get(f.proveedor)||0) + f.neto);
+    }
+
+    const unitList = Array.from(byUnit.keys()).sort((a,b)=>a.localeCompare(b,"es"));
+
+    let tVentas=0,tHoras=0,tBoletas=0,tFacturas=0;
+    for(const u of byUnit.values()){
+      tVentas += u.ventas;
+      tHoras += u.costoHoras;
+      tBoletas += u.honorarios;
+      tFacturas += u.facturas;
+    }
+    const tCostos = tHoras + tBoletas + tFacturas;
+    const tResultado = tVentas - tCostos;
+
+    for(const u of byUnit.values()){
+      const areas = Array.from(u.byArea.values()).sort((a,b)=>a.area.localeCompare(b.area,"es"));
+      let running = u.ventas;
+      for(const a of areas){
+        const total = a.costoHoras + a.honorarios + a.facturas;
+        running -= total;
+        a.totalCostos = total;
+        a.resultadoAcum = running;
+      }
+    }
+
+    return { unitList, byUnit, totals:{tVentas,tHoras,tBoletas,tFacturas,tCostos,tResultado} };
+  }
+
+  function refreshSelector(){
+    const sel = $("selUnidad");
+    const current = sel.value;
+    sel.innerHTML = "";
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "(Selecciona una unidad)";
+    sel.appendChild(opt0);
+    if(!report) return;
+    for(const u of report.unitList){
+      const op = document.createElement("option");
+      op.value = u;
+      op.textContent = u;
+      sel.appendChild(op);
+    }
+    sel.value = report.unitList.includes(current) ? current : "";
+  }
+
+  function refreshOverview(){
+    if(!report){
+      $("kVentas").textContent="—";
+      $("kHoras").textContent="—";
+      $("kBoletas").textContent="—";
+      $("kFacturas").textContent="—";
+      $("kResultado").textContent="—";
+      $("tblER").innerHTML="";
+      $("tblERAreas").innerHTML="";
+      return;
+    }
+
+    $("kVentas").textContent = money(report.totals.tVentas);
+    $("kHoras").textContent = money(report.totals.tHoras);
+    $("kBoletas").textContent = money(report.totals.tBoletas);
+    $("kFacturas").textContent = money(report.totals.tFacturas);
+    $("kResultado").textContent = money(report.totals.tResultado);
+
+    const erRows = report.unitList.map(u=>{
+      const o = report.byUnit.get(u);
+      const costos = o.costoHoras + o.honorarios + o.facturas;
+      const resultado = o.ventas - costos;
+      return [u, o.ventas, o.costoHoras, o.honorarios, o.facturas, costos, resultado];
+    });
+    const erDiv = document.createElement("div");
+    renderTable(erDiv, ["Unidad","Ventas","Costos Horas","Honorarios","Facturas","Total Costos","Resultado"], erRows);
+    $("tblER").innerHTML=""; $("tblER").appendChild(erDiv);
+
+    const rows = [];
+    for(const u of report.unitList){
+      const o = report.byUnit.get(u);
+      const areas = Array.from(o.byArea.values()).sort((a,b)=>a.area.localeCompare(b.area,"es"));
+      for(const a of areas){
+        rows.push([u, a.area, a.costoHoras, a.honorarios, a.facturas, a.totalCostos, a.resultadoAcum]);
+      }
+    }
+    const erA = document.createElement("div");
+    renderTable(erA, ["Unidad","Área","Costos Horas","Honorarios","Facturas","Total costos área","Resultado acumulado"], rows);
+    $("tblERAreas").innerHTML=""; $("tblERAreas").appendChild(erA);
+  }
+
+  function refreshUnidad(){
+    const u = $("selUnidad").value;
+    if(!report || !u || !report.byUnit.has(u)){
+      $("tblERUnidad").innerHTML = `<div class="muted">Selecciona una unidad arriba.</div>`;
+      $("tblAreasUnidad").innerHTML = "";
+      $("detailsAreasUnidad").innerHTML = "";
+      return;
+    }
+    const o = report.byUnit.get(u);
+    const costos = o.costoHoras + o.honorarios + o.facturas;
+    const resultado = o.ventas - costos;
+
+    const er1 = document.createElement("div");
+    renderTable(er1, ["Unidad","Ventas","Costos Horas","Honorarios","Facturas","Total Costos","Resultado"],
+      [[u, o.ventas, o.costoHoras, o.honorarios, o.facturas, costos, resultado]]
+    );
+    $("tblERUnidad").innerHTML=""; $("tblERUnidad").appendChild(er1);
+
+    const areas = Array.from(o.byArea.values()).sort((a,b)=>a.area.localeCompare(b.area,"es"));
+    const rows = areas.map(a=>[a.area, a.costoHoras, a.honorarios, a.facturas, a.totalCostos, a.resultadoAcum]);
+    const tbl = document.createElement("div");
+    renderTable(tbl, ["Área","Costos Horas","Honorarios","Facturas","Total costos área","Resultado acumulado"], rows);
+    $("tblAreasUnidad").innerHTML=""; $("tblAreasUnidad").appendChild(tbl);
+
+    const wrap = $("detailsAreasUnidad");
+    wrap.innerHTML = "";
+    for(const a of areas){
+      const det = document.createElement("details");
+      const sum = document.createElement("summary");
+      sum.textContent = `${a.area}  ·  Total costos: ${money(a.totalCostos)}  ·  Resultado acum: ${money(a.resultadoAcum)}`;
+      det.appendChild(sum);
+
+      const hoursMap = o.horasAreaPersona.get(a.area) || new Map();
+      if(hoursMap.size){
+        const rowsH = Array.from(hoursMap.values()).sort((x,y)=>Math.abs(y.costo)-Math.abs(x.costo)).map(p=>[p.persona, p.horas, p.costo]);
+        const d = document.createElement("div");
+        d.style.marginTop = "10px";
+        d.innerHTML = `<div class="title" style="margin:10px 0 8px;">Horas → Personas</div>`;
+        const t = document.createElement("div");
+        renderTable(t, ["Persona","Horas","Costo"], rowsH);
+        d.appendChild(t);
+        det.appendChild(d);
+      } else {
+        const p = document.createElement("div");
+        p.className = "muted";
+        p.style.marginTop = "10px";
+        p.textContent = "Horas: sin registros en esta área.";
+        det.appendChild(p);
+      }
+
+      const bMap = o.boletasAreaNombre.get(a.area) || new Map();
+      if(bMap.size){
+        const rowsB = Array.from(bMap.entries()).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1])).map(([n,v])=>[n,v]);
+        const d = document.createElement("div");
+        d.style.marginTop = "12px";
+        d.innerHTML = `<div class="title" style="margin:10px 0 8px;">Boletas (monto fijo) → Personas</div>`;
+        const t = document.createElement("div");
+        renderTable(t, ["Persona","Monto neto"], rowsB);
+        d.appendChild(t);
+        det.appendChild(d);
+      } else {
+        const p = document.createElement("div");
+        p.className = "muted";
+        p.style.marginTop = "10px";
+        p.textContent = "Boletas: sin registros en esta área.";
+        det.appendChild(p);
+      }
+
+      const fMap = o.facturasAreaProveedor.get(a.area) || new Map();
+      if(fMap.size){
+        const rowsF = Array.from(fMap.entries()).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1])).map(([n,v])=>[n,v]);
+        const d = document.createElement("div");
+        d.style.marginTop = "12px";
+        d.innerHTML = `<div class="title" style="margin:10px 0 8px;">Facturas → Proveedores</div>`;
+        const t = document.createElement("div");
+        renderTable(t, ["Proveedor","Monto neto"], rowsF);
+        d.appendChild(t);
+        det.appendChild(d);
+      } else {
+        const p = document.createElement("div");
+        p.className = "muted";
+        p.style.marginTop = "10px";
+        p.textContent = "Facturas: sin registros en esta área.";
+        det.appendChild(p);
+      }
+
+      wrap.appendChild(det);
+      const sp = document.createElement("div");
+      sp.style.height = "10px";
+      wrap.appendChild(sp);
+    }
+  }
+
+  function refreshHorasTree(){
+    const container = $("treeHoras");
+    container.innerHTML = "";
+    if(!report || !data.horas.length){
+      container.innerHTML = `<div class="muted">Carga horas y recalcula para ver el detalle.</div>`;
+      return;
+    }
+
+    const byU = new Map();
+    for(const h of data.horas){
+      const u = h.unidad || "SIN_UNIDAD";
+      if(!byU.has(u)) byU.set(u, new Map());
+      const byA = byU.get(u);
+      const a = h.area || "Sin área";
+      if(!byA.has(a)) byA.set(a, new Map());
+      const byP = byA.get(a);
+      if(!byP.has(h.persona)) byP.set(h.persona, {persona:h.persona, horas:0, costo:0});
+      const p = byP.get(h.persona);
+      p.horas += h.horas;
+      p.costo += h.costo;
+    }
+
+    const units = Array.from(byU.keys()).sort((a,b)=>a.localeCompare(b,"es"));
+    for(const u of units){
+      const detU = document.createElement("details");
+      const sumU = document.createElement("summary");
+      let totalU = 0;
+      for(const aMap of byU.get(u).values()){
+        for(const p of aMap.values()) totalU += p.costo;
+      }
+      sumU.textContent = `${u} · Costos horas: ${money(totalU)}`;
+      detU.appendChild(sumU);
+
+      const areas = Array.from(byU.get(u).keys()).sort((a,b)=>a.localeCompare(b,"es"));
+      for(const a of areas){
+        const detA = document.createElement("details");
+        detA.style.marginTop = "10px";
+        const sumA = document.createElement("summary");
+        let totalA = 0;
+        for(const p of byU.get(u).get(a).values()) totalA += p.costo;
+        sumA.textContent = `${a} · Costos horas: ${money(totalA)}`;
+        detA.appendChild(sumA);
+
+        const people = Array.from(byU.get(u).get(a).values()).sort((x,y)=>Math.abs(y.costo)-Math.abs(x.costo));
+        const rows = people.map(p=>[p.persona, p.horas, p.costo]);
+        const t = document.createElement("div");
+        t.style.marginTop = "10px";
+        renderTable(t, ["Persona","Horas","Costo"], rows);
+        detA.appendChild(t);
+
+        detU.appendChild(detA);
+      }
+
+      container.appendChild(detU);
+      const spacer = document.createElement("div");
+      spacer.style.height = "10px";
+      container.appendChild(spacer);
+    }
+  }
+
+  function refreshCounts(){
+    $("counts").innerHTML = `
+      <div>Horas: <b>${data.horas.length}</b></div>
+      <div>Boletas: <b>${data.boletas.length}</b></div>
+      <div>Facturas: <b>${data.facturas.length}</b></div>
+      <div>Ventas: <b>${data.ventas.length}</b></div>
+      <div>Unidades detectadas: <b>${report ? report.unitList.length : 0}</b></div>
+    `;
+  }
+
+  function refreshAll(){
+    $("btnExportER").disabled = !report;
+    $("btnExportJSON").disabled = !report;
+    refreshSelector();
+    refreshOverview();
+    refreshUnidad();
+    refreshHorasTree();
+    refreshCounts();
+  }
+
+  function setTab(name){
+    const map = {overview:"view-overview", unidad:"view-unidad", horas:"view-horas", datos:"view-datos"};
+    for(const k of Object.keys(map)){
+      $(map[k]).style.display = (k===name) ? "" : "none";
+    }
+    document.querySelectorAll(".tab").forEach(btn=>{
+      btn.classList.toggle("active", btn.dataset.tab===name);
+    });
+  }
+  document.querySelectorAll(".tab").forEach(btn=>{
+    btn.addEventListener("click", ()=>setTab(btn.dataset.tab));
+  });
+
+  $("inHoras").addEventListener("change", async (e)=>{
+    const files = Array.from(e.target.files||[]);
+    setFileList($("listHoras"), files);
+    try{ data.horas = await readFiles(files, "horas"); setMsg(`Horas: cargadas ${data.horas.length} filas.`, false); }
+    catch(err){ data.horas = []; setMsg(String(err.message || err), true); }
+  });
+
+  $("inBoletas").addEventListener("change", async (e)=>{
+    const files = Array.from(e.target.files||[]);
+    setFileList($("listBoletas"), files);
+    try{ data.boletas = await readFiles(files, "boletas"); setMsg(`Boletas: cargadas ${data.boletas.length} filas.`, false); }
+    catch(err){ data.boletas = []; setMsg(String(err.message || err), true); }
+  });
+
+  $("inFacturas").addEventListener("change", async (e)=>{
+    const files = Array.from(e.target.files||[]);
+    setFileList($("listFacturas"), files);
+    try{ data.facturas = await readFiles(files, "facturas"); setMsg(`Facturas: cargadas ${data.facturas.length} filas.`, false); }
+    catch(err){ data.facturas = []; setMsg(String(err.message || err), true); }
+  });
+
+  $("inVentas").addEventListener("change", async (e)=>{
+    const files = Array.from(e.target.files||[]);
+    setFileList($("listVentas"), files);
+    try{ data.ventas = await readFiles(files, "ventas"); setMsg(`Ventas: cargadas ${data.ventas.length} filas.`, false); }
+    catch(err){ data.ventas = []; setMsg(String(err.message || err), true); }
+  });
+
+  $("btnCalc").addEventListener("click", ()=>{
+    try{ report = calcReport(); refreshAll(); setMsg("Reporte recalculado ✅", false); }
+    catch(err){ report = null; refreshAll(); setMsg(String(err.message || err), true); }
+  });
+
+  $("selUnidad").addEventListener("change", refreshUnidad);
+
+  $("btnReset").addEventListener("click", ()=>{
+    data = { horas:[], boletas:[], facturas:[], ventas:[] };
+    report = null;
+    $("inHoras").value=""; $("inBoletas").value=""; $("inFacturas").value=""; $("inVentas").value="";
+    $("listHoras").innerHTML=""; $("listBoletas").innerHTML=""; $("listFacturas").innerHTML=""; $("listVentas").innerHTML="";
+    setMsg("Todo limpio. Carga archivos o usa ejemplos y recalcula.", false);
+    refreshAll();
+  });
+
+  // Ejemplos embebidos + botón de cargar/descargar
+  const EXAMPLES = {
+    horas: `unidad_negocio,area,persona,horas,valor_acordado
+Boulder Providencia,Recepción,Pedro Flores,12,8000
+Boulder Providencia,Recepción,María López,10,7800
+Boulder Providencia,Operación,Juan Soto,8,9000
+Boulder La Florida,Recepción,María López,11,7800
+Boulder La Florida,Operación,Diego Pérez,7,11500
+`,
+    boletas: `unidad_negocio,area,nombre,numero_boleta,monto_neto
+Boulder Providencia,Operación,Pedro Flores,BH-1001,220000
+Boulder Providencia,Entrenamiento,Camila Rojas,BH-1002,350000
+Boulder La Florida,Operación,Diego Pérez,BH-2001,260000
+`,
+    facturas: `unidad_negocio,area,razon_social,numero_factura,monto_neto
+Boulder Providencia,Operación,HoldCo SpA,F-9001,480000
+Boulder Providencia,Aseo,Limpieza Norte Ltda.,F-9002,120000
+Boulder La Florida,Operación,Tiza y Cuerdas SpA,F-9101,210000
+`,
+    ventas: `unidad_negocio,ventas_netas
+Boulder Providencia,1800000
+Boulder La Florida,1400000
+`,
+  };
+
+  $("btnLoadExamples").addEventListener("click", ()=>{
+    try{
+      data.horas = parseCategoryFromText(EXAMPLES.horas, "horas", "ejemplo_horas.csv");
+      data.boletas = parseCategoryFromText(EXAMPLES.boletas, "boletas", "ejemplo_boletas.csv");
+      data.facturas = parseCategoryFromText(EXAMPLES.facturas, "facturas", "ejemplo_facturas.csv");
+      data.ventas = parseCategoryFromText(EXAMPLES.ventas, "ventas", "ejemplo_ventas.csv");
+
+      $("listHoras").innerHTML = "<li>ejemplo_horas.csv</li>";
+      $("listBoletas").innerHTML = "<li>ejemplo_boletas.csv</li>";
+      $("listFacturas").innerHTML = "<li>ejemplo_facturas.csv</li>";
+      $("listVentas").innerHTML = "<li>ejemplo_ventas.csv</li>";
+
+      report = calcReport();
+      refreshAll();
+      setMsg("Ejemplos cargados y reporte calculado ✅", false);
+    } catch(err) {
+      setMsg(String(err.message || err), true);
+    }
+  });
+
+  $("btnDownloadExamples").addEventListener("click", ()=>{
+    downloadText("ejemplo_horas.csv", EXAMPLES.horas, "text/csv");
+    downloadText("ejemplo_boletas.csv", EXAMPLES.boletas, "text/csv");
+    downloadText("ejemplo_facturas.csv", EXAMPLES.facturas, "text/csv");
+    downloadText("ejemplo_ventas.csv", EXAMPLES.ventas, "text/csv");
+  });
+
+  $("btnExportER").addEventListener("click", ()=>{
+    if(!report) return;
+    const lines = [];
+    lines.push(["unidad","ventas","costos_horas","honorarios","facturas","total_costos","resultado"].join(","));
+    for(const u of report.unitList){
+      const o = report.byUnit.get(u);
+      const total = o.costoHoras + o.honorarios + o.facturas;
+      const res = o.ventas - total;
+      lines.push([`"${u.replace(/"/g,'""')}"`, o.ventas, o.costoHoras, o.honorarios, o.facturas, total, res].join(","));
+    }
+    downloadText("estado_resultados_unidad.csv", lines.join("\n"), "text/csv");
+  });
+
+  $("btnExportJSON").addEventListener("click", ()=>{
+    if(!report) return;
+    const payload = {
+      data,
+      totals: report.totals,
+      byUnit: Object.fromEntries(Array.from(report.byUnit.entries()).map(([k,v])=>[
+        k,
+        {
+          unidad:v.unidad,
+          ventas:v.ventas,
+          costoHoras:v.costoHoras,
+          honorarios:v.honorarios,
+          facturas:v.facturas,
+          byArea:Object.fromEntries(Array.from(v.byArea.entries()).map(([a,ax])=>[
+            a,
+            {area:ax.area,costoHoras:ax.costoHoras,honorarios:ax.honorarios,facturas:ax.facturas,totalCostos:ax.totalCostos,resultadoAcum:ax.resultadoAcum}
+          ]))
+        }
+      ]))
+    };
+    downloadText("reporte.json", JSON.stringify(payload, null, 2), "application/json");
+  });
+
+  refreshAll();
+})();
+</script>
+</body>
+</html>
