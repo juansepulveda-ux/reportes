@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reportes financieros desde CSV (offline)</title>
+  <style>
+    :root { --border:#e5e7eb; --muted:#6b7280; --bg:#f6f7fb; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, Arial, sans-serif;
+           margin: 0; background: var(--bg); color:#111827; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 24px; }
+    header { display:flex; gap:16px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
+    h1 { margin: 0; font-size: 22px; letter-spacing: .2px; }
+    p { margin: 8px 0 0; color: var(--muted); line-height: 1.4; }
+    .card { background: white; border: 1px solid var(--border); border-radius: 16px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .grid { display:grid; gap: 12px; }
+    .controls { grid-template-columns: 1fr; }
+    @media (min-width: 760px){ .controls { grid-template-columns: 1.2fr .8fr; } }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    label { font-weight: 600; font-size: 13px; color:#111827; }
+    input[type="file"], select, button {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #fff;
+    }
+    button { cursor: pointer; }
+    button.primary { background:#111827; color:#fff; border-color:#111827; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .kpis { grid-template-columns: 1fr 1fr; }
+    @media (min-width: 760px){ .kpis { grid-template-columns: repeat(4, 1fr); } }
+    .kpi .name { font-size: 12px; color: var(--muted); }
+    .kpi .val { font-size: 18px; font-weight: 700; margin-top: 6px; }
+    .section-title { margin: 18px 0 10px; font-size: 14px; color:#111827; }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 14px; border: 1px solid var(--border); background:#fff; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    th { text-align: left; color:#111827; background:#fafafa; font-weight: 700; }
+    tr:last-child td { border-bottom: none; }
+    td.num { text-align:right; font-variant-numeric: tabular-nums; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .error { color:#b91c1c; font-weight: 600; }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding: 8px 10px; border:1px solid var(--border); border-radius: 999px; background:#fff; }
+    code { background:#f3f4f6; padding:2px 6px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Reportes financieros desde CSV (abre directo en Mac)</h1>
+        <p>Carga tu archivo <code>.csv</code> y obtén totales, resumen mensual y por categoría. Funciona <b>sin internet</b>.</p>
+      </div>
+      <div class="row">
+        <button id="btnSample" class="primary">Descargar CSV de ejemplo</button>
+      </div>
+    </header>
+
+    <div class="grid controls" style="margin-top:16px;">
+      <div class="card">
+        <div class="row">
+          <div style="flex:1; min-width:240px;">
+            <label for="file">Tu CSV</label><br/>
+            <input type="file" id="file" accept=".csv,text/csv" />
+            <div class="muted" style="margin-top:8px;">
+              Columnas esperadas: <code>fecha</code>, <code>descripcion</code>, <code>categoria</code>, <code>cuenta</code>, <code>monto</code> (y opcional <code>moneda</code>).
+            </div>
+          </div>
+
+          <div style="min-width:220px;">
+            <label for="delim">Separador</label><br/>
+            <select id="delim">
+              <option value="auto" selected>Auto</option>
+              <option value=",">Coma (,)</option>
+              <option value=";">Punto y coma (;)</option>
+              <option value="\t">Tab</option>
+            </select>
+            <div class="muted" style="margin-top:8px;">
+              Si tu CSV está en Excel (español), suele ser <code>;</code>.
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px;">
+          <span class="pill"><b>Tip:</b> gastos negativos, ingresos positivos</span>
+          <span class="pill">Fechas formato <code>YYYY-MM-DD</code></span>
+        </div>
+
+        <div id="msg" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Acciones</div>
+        <div class="row">
+          <button id="btnJSON" disabled>Descargar reporte (JSON)</button>
+          <button id="btnCSV" disabled>Descargar resumen (CSV)</button>
+        </div>
+        <div class="muted" style="margin-top:10px;">
+          El reporte se genera en tu computador. No se sube nada a internet.
+        </div>
+      </div>
+    </div>
+
+    <div class="grid kpis" style="margin-top:12px;">
+      <div class="card kpi"><div class="name">Movimientos</div><div class="val" id="kpiCount">—</div></div>
+      <div class="card kpi"><div class="name">Ingresos</div><div class="val" id="kpiIn">—</div></div>
+      <div class="card kpi"><div class="name">Gastos</div><div class="val" id="kpiOut">—</div></div>
+      <div class="card kpi"><div class="name">Neto</div><div class="val" id="kpiNet">—</div></div>
+    </div>
+
+    <div class="section-title">Resumen mensual</div>
+    <div id="monthlyWrap"></div>
+
+    <div class="section-title">Por categoría</div>
+    <div id="catWrap"></div>
+
+    <div class="section-title">Vista previa (primeras 20 filas)</div>
+    <div id="previewWrap"></div>
+
+    <div class="muted" style="margin:18px 0 6px;">
+      Si tus columnas tienen otros nombres, renómbralas en el CSV o dime cuáles son y te ajusto el HTML.
+    </div>
+  </div>
+
+<script>
+(function(){
+  const $ = (id) => document.getElementById(id);
+
+  const fileInput = $("file");
+  const delimSel = $("delim");
+  const msg = $("msg");
+
+  const kpiCount = $("kpiCount");
+  const kpiIn = $("kpiIn");
+  const kpiOut = $("kpiOut");
+  const kpiNet = $("kpiNet");
+
+  const monthlyWrap = $("monthlyWrap");
+  const catWrap = $("catWrap");
+  const previewWrap = $("previewWrap");
+
+  const btnJSON = $("btnJSON");
+  const btnCSV = $("btnCSV");
+  const btnSample = $("btnSample");
+
+  let lastReport = null;
+
+  function setMsg(text, kind="muted"){
+    msg.className = kind;
+    msg.textContent = text;
+  }
+
+  function detectDelimiter(firstLine){
+    const comma = (firstLine.match(/,/g) || []).length;
+    const semi = (firstLine.match(/;/g) || []).length;
+    const tab = (firstLine.match(/\t/g) || []).length;
+    if (tab > comma && tab > semi) return "\t";
+    if (semi > comma) return ";";
+    return ",";
+  }
+
+  // CSV parser simple con soporte de comillas dobles.
+  function parseCSV(text, delimiter){
+    const rows = [];
+    let row = [];
+    let cur = "";
+    let inQuotes = false;
+
+    for (let i=0; i<text.length; i++){
+      const c = text[i];
+      const next = text[i+1];
+
+      if (c === '"'){
+        if (inQuotes && next === '"'){ // escape ""
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+        continue;
+      }
+
+      if (!inQuotes && c === delimiter){
+        row.push(cur);
+        cur = "";
+        continue;
+      }
+
+      if (!inQuotes && (c === "\n" || c === "\r")){
+        if (c === "\r" && next === "\n") i++; // CRLF
+        row.push(cur);
+        cur = "";
+        // evita filas vacías al final
+        if (row.length > 1 || (row.length === 1 && row[0].trim() !== "")) rows.push(row);
+        row = [];
+        continue;
+      }
+
+      cur += c;
+    }
+
+    // último campo
+    row.push(cur);
+    if (row.length > 1 || (row.length === 1 && row[0].trim() !== "")) rows.push(row);
+
+    return rows;
+  }
+
+  function normalizeKey(k){
+    return String(k || "").trim().toLowerCase()
+      .normalize("NFD").replace(/\p{Diacritic}/gu, ""); // quita tildes
+  }
+
+  function parseMonto(x){
+    if (x == null) return 0;
+    let s = String(x).trim();
+
+    // elimina símbolos comunes
+    s = s.replace(/\s/g, "").replace(/[^\d,.\-+]/g, "");
+
+    // Heurística:
+    // - Si tiene coma y punto: asume "." miles y "," decimal -> quita puntos, cambia coma a punto.
+    // - Si solo tiene coma: asume coma decimal -> cambia a punto.
+    const hasComma = s.includes(",");
+    const hasDot = s.includes(".");
+    if (hasComma && hasDot){
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else if (hasComma && !hasDot){
+      s = s.replace(",", ".");
+    }
+
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function parseDateISO(d){
+    const s = String(d || "").trim();
+    // acepta YYYY-MM-DD o YYYY/MM/DD
+    const cleaned = s.replace(/\//g, "-");
+    const m = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2]), da = Number(m[3]);
+    const dt = new Date(Date.UTC(y, mo-1, da));
+    return Number.isFinite(dt.getTime()) ? dt : null;
+  }
+
+  function money(n){
+    // formato "es-CL" para que se vea bien en Mac (puedes cambiarlo)
+    try {
+      return new Intl.NumberFormat("es-CL", { maximumFractionDigits: 2 }).format(n);
+    } catch {
+      return (Math.round(n*100)/100).toFixed(2);
+    }
+  }
+
+  function renderTable(container, headers, rows){
+    const thead = `<thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>`;
+    const tbody = `<tbody>${rows.map(r => `<tr>${r.map((cell, j) => {
+      const isNum = typeof cell === "number";
+      return `<td class="${isNum ? "num" : ""}">${isNum ? money(cell) : escapeHtml(String(cell))}</td>`;
+    }).join("")}</tr>`).join("")}</tbody>`;
+    container.innerHTML = `<table>${thead}${tbody}</table>`;
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, (c) => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[c]));
+  }
+
+  function buildReport(records){
+    // calcula KPIs
+    let ingresos = 0, gastos = 0, neto = 0;
+    const byMonth = new Map();
+    const byCat = new Map();
+
+    for (const r of records){
+      const amt = r.monto;
+      neto += amt;
+      if (amt >= 0) ingresos += amt;
+      else gastos += amt;
+
+      const month = r.fechaMonth ?? "Sin fecha";
+      byMonth.set(month, (byMonth.get(month) || 0) + amt);
+
+      const cat = r.categoria || "Sin categoría";
+      byCat.set(cat, (byCat.get(cat) || 0) + amt);
+    }
+
+    const monthlyRows = [...byMonth.entries()]
+      .sort((a,b) => a[0].localeCompare(b[0]))
+      .map(([m, total]) => [m, total]);
+
+    const catRows = [...byCat.entries()]
+      .sort((a,b) => Math.abs(b[1]) - Math.abs(a[1]))
+      .map(([c, total]) => [c, total]);
+
+    return {
+      count: records.length,
+      ingresos, gastos, neto,
+      monthly: monthlyRows,
+      categories: catRows,
+      preview: records.slice(0, 20)
+    };
+  }
+
+  function toRecords(rows){
+    if (!rows.length) return [];
+    const headers = rows[0].map(h => normalizeKey(h));
+    const idx = (name) => headers.indexOf(normalizeKey(name));
+
+    const iFecha = idx("fecha");
+    const iDesc = idx("descripcion");
+    const iCat = idx("categoria");
+    const iCuenta = idx("cuenta");
+    const iMonto = idx("monto");
+    const iMoneda = idx("moneda");
+
+    if (iMonto === -1){
+      throw new Error("No encontré la columna 'monto' en el encabezado.");
+    }
+
+    const recs = [];
+    for (let r=1; r<rows.length; r++){
+      const row = rows[r];
+      const rawFecha = iFecha !== -1 ? row[iFecha] : "";
+      const dt = parseDateISO(rawFecha);
+      const month = dt ? `${dt.getUTCFullYear()}-${String(dt.getUTCMonth()+1).padStart(2,"0")}` : "Sin fecha";
+
+      recs.push({
+        fecha: rawFecha || "",
+        fechaMonth: month,
+        descripcion: iDesc !== -1 ? (row[iDesc] || "") : "",
+        categoria: iCat !== -1 ? (row[iCat] || "").trim() : "Sin categoría",
+        cuenta: iCuenta !== -1 ? (row[iCuenta] || "").trim() : "",
+        monto: parseMonto(row[iMonto]),
+        moneda: iMoneda !== -1 ? (row[iMoneda] || "").trim() : ""
+      });
+    }
+    return recs;
+  }
+
+  function downloadText(filename, content, mime="text/plain"){
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 500);
+  }
+
+  function reportToCSV(report){
+    const lines = [];
+    lines.push(["tipo","item","total"].join(","));
+    lines.push(["kpi","Ingresos",report.ingresos].join(","));
+    lines.push(["kpi","Gastos",report.gastos].join(","));
+    lines.push(["kpi","Neto",report.neto].join(","));
+    for (const [m, t] of report.monthly){
+      lines.push(["mes", m, t].join(","));
+    }
+    for (const [c, t] of report.categories){
+      // protege comas
+      const safe = `"${String(c).replace(/"/g,'""')}"`;
+      lines.push(["categoria", safe, t].join(","));
+    }
+    return lines.join("\n");
+  }
+
+  function render(report){
+    kpiCount.textContent = String(report.count);
+    kpiIn.textContent = money(report.ingresos);
+    kpiOut.textContent = money(report.gastos);
+    kpiNet.textContent = money(report.neto);
+
+    const monthlyDiv = document.createElement("div");
+    renderTable(monthlyDiv, ["Mes", "Total"], report.monthly);
+
+    const catDiv = document.createElement("div");
+    renderTable(catDiv, ["Categoría", "Total"], report.categories);
+
+    const prevDiv = document.createElement("div");
+    const prevRows = report.preview.map(r => [r.fecha, r.descripcion, r.categoria, r.cuenta, r.monto, r.moneda]);
+    renderTable(prevDiv, ["Fecha", "Descripción", "Categoría", "Cuenta", "Monto", "Moneda"], prevRows);
+
+    monthlyWrap.innerHTML = "";
+    monthlyWrap.appendChild(monthlyDiv);
+
+    catWrap.innerHTML = "";
+    catWrap.appendChild(catDiv);
+
+    previewWrap.innerHTML = "";
+    previewWrap.appendChild(prevDiv);
+  }
+
+  function handleFile(file){
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const text = String(reader.result || "");
+        const firstLine = text.split(/\r\n|\n|\r/)[0] || "";
+        const chosen = delimSel.value === "auto" ? detectDelimiter(firstLine) : delimSel.value;
+
+        const rows = parseCSV(text, chosen);
+        const recs = toRecords(rows);
+        if (!recs.length) throw new Error("No hay datos (solo encabezado o archivo vacío).");
+
+        lastReport = buildReport(recs);
+        render(lastReport);
+
+        btnJSON.disabled = false;
+        btnCSV.disabled = false;
+
+        setMsg(`Listo: leí ${lastReport.count} movimientos usando separador ${chosen === "\t" ? "TAB" : "'" + chosen + "'"}.`);
+      } catch (e){
+        lastReport = null;
+        btnJSON.disabled = true;
+        btnCSV.disabled = true;
+        monthlyWrap.innerHTML = "";
+        catWrap.innerHTML = "";
+        previewWrap.innerHTML = "";
+        setMsg(e.message || "Error leyendo el CSV.", "error");
+      }
+    };
+    reader.onerror = () => setMsg("No pude leer el archivo.", "error");
+    reader.readAsText(file, "utf-8");
+  }
+
+  fileInput.addEventListener("change", () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    setMsg("Leyendo archivo...");
+    handleFile(f);
+  });
+
+  delimSel.addEventListener("change", () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    setMsg("Reprocesando con el nuevo separador...");
+    handleFile(f);
+  });
+
+  btnJSON.addEventListener("click", () => {
+    if (!lastReport) return;
+    downloadText("reporte.json", JSON.stringify(lastReport, null, 2), "application/json");
+  });
+
+  btnCSV.addEventListener("click", () => {
+    if (!lastReport) return;
+    downloadText("resumen_reporte.csv", reportToCSV(lastReport), "text/csv");
+  });
+
+  btnSample.addEventListener("click", () => {
+    const sample =
+`fecha,descripcion,categoria,cuenta,monto,moneda
+2025-01-03,Sueldo,Ingresos,Banco,1200000,CLP
+2025-01-05,Supermercado,Alimentación,Tarjeta,-65000,CLP
+2025-01-07,Transporte,Transporte,Efectivo,-18000,CLP
+2025-01-10,Arriendo,Vivienda,Banco,-450000,CLP
+2025-01-12,Luz,Vivienda,Banco,-42000,CLP
+2025-01-15,Internet,Vivienda,Banco,-25000,CLP
+2025-01-18,Cine,Ocio,Tarjeta,-12000,CLP
+2025-01-20,Venta,Ingresos,Efectivo,35000,CLP
+2025-01-22,Restaurante,Comida fuera,Tarjeta,-22000,CLP
+2025-01-25,Ahorro,Ahorro,Banco,-100000,CLP
+2025-01-31,Interés,Ingresos,Banco,2500,CLP
+`;
+    downloadText("movimientos_ejemplo.csv", sample, "text/csv");
+  });
+
+  setMsg("Carga un CSV para generar el reporte.");
+})();
+</script>
+</body>
+</html>
