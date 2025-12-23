@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reporte por Sucursal/Área (XLSX/XLS/CSV)</title>
+
+  <!-- SheetJS (XLSX) para leer .xls/.xlsx en el navegador -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root{--b:#e5e7eb;--m:#6b7280;--bg:#f6f7fb;--ink:#111827;--ok:#059669;--bad:#b91c1c;}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Arial,sans-serif;}
+    .wrap{max-width:1150px;margin:0 auto;padding:20px;}
+    h1{margin:0;font-size:20px;}
+    .sub{margin-top:6px;color:var(--m);font-size:13px;line-height:1.45;}
+    .grid{display:grid;gap:12px;}
+    .card{background:#fff;border:1px solid var(--b);border-radius:16px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.04);}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
+    .rowL{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    button,select,input[type=file]{border:1px solid var(--b);border-radius:12px;padding:10px 12px;background:#fff;font-size:14px;}
+    button{cursor:pointer}
+    button.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+    button:disabled{opacity:.55;cursor:not-allowed;}
+    .msg{margin-top:10px;color:var(--m);font-size:13px;line-height:1.45;}
+    .msg.ok{color:var(--ok);font-weight:900;}
+    .msg.bad{color:var(--bad);font-weight:900;}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;}
+    .tab{border:1px solid var(--b);border-radius:999px;padding:8px 12px;background:#fff;font-weight:900;font-size:13px;cursor:pointer;}
+    .tab.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+    .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+    @media(min-width:900px){.kpis{grid-template-columns:repeat(5,1fr);}}
+    .kpi .name{color:var(--m);font-size:12px;}
+    .kpi .val{font-size:18px;font-weight:950;margin-top:6px;font-variant-numeric:tabular-nums;}
+    table{width:100%;border-collapse:collapse;border:1px solid var(--b);border-radius:14px;overflow:hidden;background:#fff;}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--b);font-size:13px;}
+    th{background:#fafafa;text-align:left;font-weight:950;}
+    tr:last-child td{border-bottom:none;}
+    td.num{text-align:right;font-variant-numeric:tabular-nums;}
+    .title{margin:16px 0 10px;font-size:14px;font-weight:950;}
+    .dz{border:2px dashed #cbd5e1;border-radius:16px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:8px;transition:all .15s ease;}
+    .dz.drag{border-color:#111827;box-shadow:0 8px 18px rgba(0,0,0,.08);}
+    .dzTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap;}
+    .dzName{font-weight:950;}
+    .dzHint{color:var(--m);font-size:12px;line-height:1.45;}
+    .dzFiles{color:var(--m);font-size:12px;margin:0;padding-left:18px;}
+    details{border:1px solid var(--b);border-radius:14px;background:#fff;padding:10px 12px;}
+    summary{cursor:pointer;font-weight:950;}
+    code{background:#f3f4f6;padding:2px 6px;border-radius:8px}
+    .mini{font-size:12px;color:var(--m);line-height:1.45;}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row" style="align-items:flex-start;">
+    <div>
+      <h1>Reporte por Sucursal y Área (XLSX / XLS / CSV)</h1>
+      <div class="sub">
+        Arrastra y suelta archivos (1 o 100, da lo mismo). Cada categoría acumula (“se adiciona”) con todos los archivos cargados.<br/>
+        <b>Privacidad:</b> todo se procesa en tu navegador. No se suben ni se guardan archivos.
+      </div>
+    </div>
+    <div class="rowL">
+      <button id="btnRecalc" class="primary" type="button">Recalcular</button>
+      <button id="btnReset" type="button">Limpiar</button>
+      <button id="btnExportER" type="button" disabled>Exportar ER (CSV)</button>
+    </div>
+  </div>
+
+  <div id="msg" class="msg">Carga archivos (arrastrando o con “Seleccionar archivos”), luego presiona “Recalcular”.</div>
+
+  <div class="grid" style="margin-top:12px;">
+    <div class="card">
+      <div class="title" style="margin-top:0;">Carga de datos (drag & drop)</div>
+      <div class="grid" style="grid-template-columns:1fr; gap:12px;">
+        <div class="dz" id="dzVentas">
+          <div class="dzTop">
+            <div>
+              <div class="dzName">1) Ventas</div>
+              <div class="dzHint">Columnas esperadas: <code>unidad_negocio</code> (o <code>sucursal</code>) + <code>ventas_netas</code>.</div>
+            </div>
+            <div class="rowL"><input id="inVentas" type="file" multiple accept=".xlsx,.xls,.csv" /></div>
+          </div>
+          <ul class="dzFiles" id="listVentas"></ul>
+        </div>
+
+        <div class="dz" id="dzBoletas">
+          <div class="dzTop">
+            <div>
+              <div class="dzName">2) Boletas de honorarios (monto fijo)</div>
+              <div class="dzHint">Columnas: <code>unidad_negocio</code> + <code>area</code> + <code>nombre</code> + <code>numero_boleta</code> + <code>monto_neto</code>.</div>
+            </div>
+            <div class="rowL"><input id="inBoletas" type="file" multiple accept=".xlsx,.xls,.csv" /></div>
+          </div>
+          <ul class="dzFiles" id="listBoletas"></ul>
+        </div>
+
+        <div class="dz" id="dzRemu">
+          <div class="dzTop">
+            <div>
+              <div class="dzName">3) Remuneraciones (monto fijo)</div>
+              <div class="dzHint">Columnas: <code>unidad_negocio</code> + <code>area</code> + <code>nombre</code> + <code>monto_neto</code> (o <code>monto</code>).</div>
+            </div>
+            <div class="rowL"><input id="inRemu" type="file" multiple accept=".xlsx,.xls,.csv" /></div>
+          </div>
+          <ul class="dzFiles" id="listRemu"></ul>
+        </div>
+
+        <div class="dz" id="dzFacturas">
+          <div class="dzTop">
+            <div>
+              <div class="dzName">4) Facturas</div>
+              <div class="dzHint">Columnas: <code>unidad_negocio</code> + <code>area</code> + <code>razon_social</code> + <code>numero_factura</code> + <code>monto_neto</code>.</div>
+            </div>
+            <div class="rowL"><input id="inFacturas" type="file" multiple accept=".xlsx,.xls,.csv" /></div>
+          </div>
+          <ul class="dzFiles" id="listFacturas"></ul>
+        </div>
+      </div>
+
+      <div class="mini" style="margin-top:10px;">
+        Si tu Excel tiene varias hojas, se lee la <b>primera</b> hoja. CSV: coma <code>,</code> o punto y coma <code>;</code>.
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="overview">Resumen</button>
+    <button class="tab" data-tab="sucursal">Por sucursal</button>
+    <button class="tab" data-tab="datos">Datos</button>
+  </div>
+
+  <div id="view-overview">
+    <div class="kpis">
+      <div class="card kpi"><div class="name">Ventas</div><div class="val" id="kVentas">—</div></div>
+      <div class="card kpi"><div class="name">Honorarios</div><div class="val" id="kBoletas">—</div></div>
+      <div class="card kpi"><div class="name">Remuneraciones</div><div class="val" id="kRemu">—</div></div>
+      <div class="card kpi"><div class="name">Facturas</div><div class="val" id="kFacturas">—</div></div>
+      <div class="card kpi"><div class="name">Resultado</div><div class="val" id="kRes">—</div></div>
+    </div>
+
+    <div class="title">Estado de resultados por Sucursal</div>
+    <div id="tblER"></div>
+
+    <div class="title">Costos por Sucursal & Área (y resultado acumulado dentro de la sucursal)</div>
+    <div id="tblAreas"></div>
+  </div>
+
+  <div id="view-sucursal" style="display:none;">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div class="rowL">
+          <div class="title" style="margin:0;">Sucursal</div>
+          <select id="selSucursal" style="min-width:320px;">
+            <option value="">(Primero carga datos y recalcula)</option>
+          </select>
+        </div>
+        <div class="mini">La selección está aquí (cerca del reporte), no en la zona de carga.</div>
+      </div>
+
+      <div class="title">ER sucursal seleccionada</div>
+      <div id="tblERSucursal"></div>
+
+      <div class="title">Áreas de la sucursal (costos y resultado acumulado)</div>
+      <div id="tblAreasSucursal"></div>
+
+      <div class="title">Detalles por área</div>
+      <div id="detAreasSucursal"></div>
+    </div>
+  </div>
+
+  <div id="view-datos" style="display:none;">
+    <div class="card">
+      <div class="title" style="margin-top:0;">Conteos cargados</div>
+      <div id="counts" class="msg"></div>
+      <div class="mini" style="margin-top:10px;">
+        Si falta <code>area</code>, se usa <b>“Sin área”</b>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id)=>document.getElementById(id);
+
+  const money = (n)=>{
+    try { return new Intl.NumberFormat("es-CL",{maximumFractionDigits:0}).format(Math.round(n)); }
+    catch { return String(Math.round(n)); }
+  };
+
+  const num = (x)=>{
+    if (x==null) return 0;
+    let s = String(x).trim().replace(/\s/g,"").replace(/[^\d,.\-+]/g,"");
+    const hasC = s.includes(","), hasD = s.includes(".");
+    if (hasC && hasD) s = s.replace(/\./g,"").replace(",",".");
+    else if (hasC && !hasD) s = s.replace(",",".");
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const norm = (k)=>String(k||"").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[\s\-]/g,"_");
+
+  function setMsg(text, kind=""){
+    const el = $("msg");
+    el.className = "msg" + (kind ? " " + kind : "");
+    el.textContent = text;
+  }
+
+  function detectDelimiter(firstLine){
+    const comma=(firstLine.match(/,/g)||[]).length;
+    const semi =(firstLine.match(/;/g)||[]).length;
+    const tab  =(firstLine.match(/\t/g)||[]).length;
+    if (tab>comma && tab>semi) return "\t";
+    if (semi>comma) return ";";
+    return ",";
+  }
+
+  function parseCSV(text, delimiter){
+    const rows=[]; let row=[]; let cur=""; let inQ=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i], n=text[i+1];
+      if(c === '"'){
+        if(inQ && n === '"'){ cur+='"'; i++; }
+        else inQ=!inQ;
+        continue;
+      }
+      if(!inQ && c === delimiter){ row.push(cur); cur=""; continue; }
+      if(!inQ && (c === "\n" || c === "\r")){
+        if(c === "\r" && n === "\n") i++;
+        row.push(cur); cur="";
+        if(row.length>1 || (row[0]||"").trim()!=="") rows.push(row);
+        row=[]; continue;
+      }
+      cur += c;
+    }
+    row.push(cur);
+    if(row.length>1 || (row[0]||"").trim()!=="") rows.push(row);
+    return rows;
+  }
+
+  function mapHeaders(headers){
+    const h = headers.map(norm);
+    const idxOf = (...names)=>{
+      for(const nm of names){
+        const i = h.indexOf(norm(nm));
+        if(i!==-1) return i;
+      }
+      return -1;
+    };
+    return { idxOf };
+  }
+
+  function rowsFromSheet(sheet){
+    const arr = XLSX.utils.sheet_to_json(sheet, {header:1, blankrows:false, defval:""});
+    return arr.filter(r => Array.isArray(r) && r.some(c => String(c).trim() !== ""));
+  }
+
+  function parseCategoryFromRows(rows, category, filename="(tabla)"){
+    if(!rows || rows.length<2) return [];
+    const headers = rows[0].map(String);
+    const { idxOf } = mapHeaders(headers);
+    const out = [];
+    const get = (row, i)=> (i===-1 ? "" : (row[i] ?? ""));
+
+    const suc = () => idxOf("unidad_negocio","unidad","sucursal","local","unidad_de_negocio");
+    const area = () => idxOf("area","área");
+    const monto = () => idxOf("monto_neto","neto","monto","total_neto","monto_liquido");
+
+    if(category === "ventas"){
+      const iU = suc();
+      const iV = idxOf("ventas_netas","ventas","neto_ventas","monto_neto","monto");
+      if(iU===-1 || iV===-1) throw new Error(`Ventas: faltan columnas (unidad_negocio/sucursal y ventas_netas) en: ${filename}`);
+      for(let r=1;r<rows.length;r++){
+        const row = rows[r];
+        const unidad = String(get(row,iU)).trim();
+        const ventas = num(get(row,iV));
+        if(!unidad) continue;
+        out.push({unidad, ventas});
+      }
+    }
+
+    if(category === "boletas"){
+      const iU = suc();
+      const iA = area();
+      const iN = idxOf("nombre","persona","trabajador","colaborador");
+      const iF = idxOf("numero_boleta","n_boleta","folio","numero","nro_boleta");
+      const iM = monto();
+      if(iU===-1 || iN===-1 || iF===-1 || iM===-1) throw new Error(`Boletas: faltan columnas mínimas en: ${filename}`);
+      for(let r=1;r<rows.length;r++){
+        const row = rows[r];
+        const unidad = String(get(row,iU)).trim();
+        if(!unidad) continue;
+        out.push({
+          unidad,
+          area: (iA===-1 ? "Sin área" : (String(get(row,iA)).trim() || "Sin área")),
+          nombre: String(get(row,iN)).trim() || "Sin nombre",
+          numero: String(get(row,iF)).trim(),
+          neto: num(get(row,iM))
+        });
+      }
+    }
+
+    if(category === "remu"){
+      const iU = suc();
+      const iA = area();
+      const iN = idxOf("nombre","persona","trabajador","colaborador");
+      const iM = monto();
+      if(iU===-1 || iN===-1 || iM===-1) throw new Error(`Remuneraciones: faltan columnas (unidad_negocio/sucursal, nombre, monto) en: ${filename}`);
+      for(let r=1;r<rows.length;r++){
+        const row = rows[r];
+        const unidad = String(get(row,iU)).trim();
+        if(!unidad) continue;
+        out.push({
+          unidad,
+          area: (iA===-1 ? "Sin área" : (String(get(row,iA)).trim() || "Sin área")),
+          nombre: String(get(row,iN)).trim() || "Sin nombre",
+          neto: num(get(row,iM))
+        });
+      }
+    }
+
+    if(category === "facturas"){
+      const iU = suc();
+      const iA = area();
+      const iR = idxOf("razon_social","razon","proveedor","empresa");
+      const iF = idxOf("numero_factura","n_factura","folio","numero","nro_factura");
+      const iM = monto();
+      if(iU===-1 || iR===-1 || iF===-1 || iM===-1) throw new Error(`Facturas: faltan columnas mínimas en: ${filename}`);
+      for(let r=1;r<rows.length;r++){
+        const row = rows[r];
+        const unidad = String(get(row,iU)).trim();
+        if(!unidad) continue;
+        out.push({
+          unidad,
+          area: (iA===-1 ? "Sin área" : (String(get(row,iA)).trim() || "Sin área")),
+          proveedor: String(get(row,iR)).trim() || "Sin proveedor",
+          numero: String(get(row,iF)).trim(),
+          neto: num(get(row,iM))
+        });
+      }
+    }
+
+    return out;
+  }
+
+  async function readFileAny(file, category){
+    const name = file.name || "(archivo)";
+    const ext = (name.split(".").pop() || "").toLowerCase();
+
+    if(ext === "csv" || (file.type||"").includes("csv")){
+      const text = await file.text();
+      const first = (text.split(/\r\n|\n|\r/)[0] || "");
+      const delim = detectDelimiter(first);
+      const arr = parseCSV(text, delim);
+      return parseCategoryFromRows(arr, category, name);
+    }
+
+    if(ext === "xlsx" || ext === "xls"){
+      if(typeof XLSX === "undefined"){
+        throw new Error("No se cargó la librería XLSX (SheetJS). Revisa tu conexión o bloqueadores.");
+      }
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:"array"});
+      const firstSheetName = wb.SheetNames[0];
+      const sheet = wb.Sheets[firstSheetName];
+      const arr = rowsFromSheet(sheet);
+      return parseCategoryFromRows(arr, category, name + " / " + firstSheetName);
+    }
+
+    throw new Error(`Formato no soportado: ${name} (usa .xlsx, .xls o .csv)`);
+  }
+
+  function renderTable(container, headers, rows){
+    const esc = (s)=>String(s).replace(/[&<>"']/g,c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+    const thead = `<thead><tr>${headers.map(x=>`<th>${esc(x)}</th>`).join("")}</tr></thead>`;
+    const tbody = `<tbody>${rows.map(r=>`<tr>${r.map(v=>{
+      const isNum = typeof v === "number";
+      return `<td class="${isNum?'num':''}">${isNum?money(v):esc(v)}</td>`;
+    }).join("")}</tr>`).join("")}</tbody>`;
+    container.innerHTML = `<table>${thead}${tbody}</table>`;
+  }
+
+  function downloadText(filename, content, mime){
+    const blob = new Blob([content], {type:mime});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 600);
+  }
+
+  const state = {
+    files: { ventas:[], boletas:[], remu:[], facturas:[] },
+    data:  { ventas:[], boletas:[], remu:[], facturas:[] },
+    report: null
+  };
+
+  function updateFileList(kind){
+    const map = { ventas:"listVentas", boletas:"listBoletas", remu:"listRemu", facturas:"listFacturas" };
+    const ul = $(map[kind]);
+    ul.innerHTML = "";
+    for(const f of state.files[kind]){
+      const li = document.createElement("li");
+      li.textContent = f.name;
+      ul.appendChild(li);
+    }
+  }
+
+  async function addFiles(kind, fileList){
+    const files = Array.from(fileList || []);
+    if(!files.length) return;
+
+    for(const f of files) state.files[kind].push(f);
+    updateFileList(kind);
+
+    let added = 0;
+    for(const f of files){
+      const rows = await readFileAny(f, kind);
+      for(const r of rows) state.data[kind].push(r);
+      added += rows.length;
+    }
+    setMsg(`${kind.toUpperCase()}: agregadas ${added} filas desde ${files.length} archivo(s).`, "ok");
+  }
+
+  function wireDropzone(dzId, kind, inputId){
+    const dz = $(dzId);
+    const input = $(inputId);
+
+    const prevent = (e)=>{ e.preventDefault(); e.stopPropagation(); };
+    ["dragenter","dragover","dragleave","drop"].forEach(ev => dz.addEventListener(ev, prevent));
+
+    dz.addEventListener("dragenter", ()=>dz.classList.add("drag"));
+    dz.addEventListener("dragover", ()=>dz.classList.add("drag"));
+    dz.addEventListener("dragleave", ()=>dz.classList.remove("drag"));
+    dz.addEventListener("drop", async (e)=>{
+      dz.classList.remove("drag");
+      try{ await addFiles(kind, e.dataTransfer.files); }
+      catch(err){ setMsg(String(err.message || err), "bad"); }
+    });
+
+    input.addEventListener("change", async (e)=>{
+      try{ await addFiles(kind, e.target.files); input.value=""; }
+      catch(err){ setMsg(String(err.message || err), "bad"); }
+    });
+  }
+
+  wireDropzone("dzVentas","ventas","inVentas");
+  wireDropzone("dzBoletas","boletas","inBoletas");
+  wireDropzone("dzRemu","remu","inRemu");
+  wireDropzone("dzFacturas","facturas","inFacturas");
+
+  function calcReport(){
+    const byUnit = new Map();
+    const ensureUnit = (u)=>{
+      if(!byUnit.has(u)){
+        byUnit.set(u, {
+          unidad:u,
+          ventas:0,
+          honorarios:0,
+          remuneraciones:0,
+          facturas:0,
+          byArea:new Map(),
+          detBoletas:new Map(),
+          detRemu:new Map(),
+          detFacturas:new Map()
+        });
+      }
+      return byUnit.get(u);
+    };
+    const ensureArea = (uObj, area)=>{
+      const a = area || "Sin área";
+      if(!uObj.byArea.has(a)){
+        uObj.byArea.set(a, {area:a, honorarios:0, remuneraciones:0, facturas:0});
+      }
+      return uObj.byArea.get(a);
+    };
+
+    for(const v of state.data.ventas){
+      const o = ensureUnit(v.unidad || "SIN_UNIDAD");
+      o.ventas += v.ventas;
+    }
+
+    for(const b of state.data.boletas){
+      const o = ensureUnit(b.unidad || "SIN_UNIDAD");
+      const aObj = ensureArea(o, b.area);
+      o.honorarios += b.neto;
+      aObj.honorarios += b.neto;
+
+      const a = b.area || "Sin área";
+      if(!o.detBoletas.has(a)) o.detBoletas.set(a, new Map());
+      const mp = o.detBoletas.get(a);
+      mp.set(b.nombre, (mp.get(b.nombre)||0) + b.neto);
+    }
+
+    for(const r of state.data.remu){
+      const o = ensureUnit(r.unidad || "SIN_UNIDAD");
+      const aObj = ensureArea(o, r.area);
+      o.remuneraciones += r.neto;
+      aObj.remuneraciones += r.neto;
+
+      const a = r.area || "Sin área";
+      if(!o.detRemu.has(a)) o.detRemu.set(a, new Map());
+      const mp = o.detRemu.get(a);
+      mp.set(r.nombre, (mp.get(r.nombre)||0) + r.neto);
+    }
+
+    for(const f of state.data.facturas){
+      const o = ensureUnit(f.unidad || "SIN_UNIDAD");
+      const aObj = ensureArea(o, f.area);
+      o.facturas += f.neto;
+      aObj.facturas += f.neto;
+
+      const a = f.area || "Sin área";
+      if(!o.detFacturas.has(a)) o.detFacturas.set(a, new Map());
+      const mp = o.detFacturas.get(a);
+      mp.set(f.proveedor, (mp.get(f.proveedor)||0) + f.neto);
+    }
+
+    const unitList = Array.from(byUnit.keys()).sort((a,b)=>a.localeCompare(b,"es"));
+
+    let tVentas=0,tBol=0,tRem=0,tFac=0;
+    for(const u of byUnit.values()){
+      tVentas += u.ventas;
+      tBol += u.honorarios;
+      tRem += u.remuneraciones;
+      tFac += u.facturas;
+    }
+    const tCostos = tBol + tRem + tFac;
+    const tRes = tVentas - tCostos;
+
+    for(const u of byUnit.values()){
+      const areas = Array.from(u.byArea.values()).sort((a,b)=>a.area.localeCompare(b.area,"es"));
+      let running = u.ventas;
+      for(const a of areas){
+        a.totalCostos = a.honorarios + a.remuneraciones + a.facturas;
+        running -= a.totalCostos;
+        a.resultadoAcum = running;
+      }
+    }
+
+    return {byUnit, unitList, totals:{tVentas,tBol,tRem,tFac,tCostos,tRes}};
+  }
+
+  function refreshSelector(){
+    const sel = $("selSucursal");
+    const curr = sel.value;
+    sel.innerHTML = "";
+    const o0 = document.createElement("option");
+    o0.value=""; o0.textContent="(Selecciona una sucursal)";
+    sel.appendChild(o0);
+    if(!state.report) return;
+    for(const u of state.report.unitList){
+      const op = document.createElement("option");
+      op.value=u; op.textContent=u;
+      sel.appendChild(op);
+    }
+    sel.value = state.report.unitList.includes(curr) ? curr : "";
+  }
+
+  function refreshOverview(){
+    const r = state.report;
+    if(!r){
+      $("kVentas").textContent="—";
+      $("kBoletas").textContent="—";
+      $("kRemu").textContent="—";
+      $("kFacturas").textContent="—";
+      $("kRes").textContent="—";
+      $("tblER").innerHTML="";
+      $("tblAreas").innerHTML="";
+      return;
+    }
+    $("kVentas").textContent = money(r.totals.tVentas);
+    $("kBoletas").textContent = money(r.totals.tBol);
+    $("kRemu").textContent = money(r.totals.tRem);
+    $("kFacturas").textContent = money(r.totals.tFac);
+    $("kRes").textContent = money(r.totals.tRes);
+
+    const erRows = r.unitList.map(u=>{
+      const o = r.byUnit.get(u);
+      const costos = o.honorarios + o.remuneraciones + o.facturas;
+      const res = o.ventas - costos;
+      return [u, o.ventas, o.honorarios, o.remuneraciones, o.facturas, costos, res];
+    });
+    const erDiv = document.createElement("div");
+    renderTable(erDiv, ["Sucursal","Ventas","Honorarios","Remuneraciones","Facturas","Total costos","Resultado"], erRows);
+    $("tblER").innerHTML=""; $("tblER").appendChild(erDiv);
+
+    const rows = [];
+    for(const u of r.unitList){
+      const o = r.byUnit.get(u);
+      const areas = Array.from(o.byArea.values()).sort((a,b)=>a.area.localeCompare(b.area,"es"));
+      for(const a of areas){
+        rows.push([u, a.area, a.honorarios, a.remuneraciones, a.facturas, a.totalCostos, a.resultadoAcum]);
+      }
+    }
+    const t = document.createElement("div");
+    renderTable(t, ["Sucursal","Área","Honorarios","Remuneraciones","Facturas","Total costos área","Resultado acumulado"], rows);
+    $("tblAreas").innerHTML=""; $("tblAreas").appendChild(t);
+  }
+
+  function refreshSucursal(){
+    const u = $("selSucursal").value;
+    const r = state.report;
+    if(!r || !u || !r.byUnit.has(u)){
+      $("tblERSucursal").innerHTML = `<div class="msg">Selecciona una sucursal.</div>`;
+      $("tblAreasSucursal").innerHTML = "";
+      $("detAreasSucursal").innerHTML = "";
+      return;
+    }
+
+    const o = r.byUnit.get(u);
+    const costos = o.honorarios + o.remuneraciones + o.facturas;
+    const res = o.ventas - costos;
+
+    const erDiv = document.createElement("div");
+    renderTable(erDiv, ["Sucursal","Ventas","Honorarios","Remuneraciones","Facturas","Total costos","Resultado"],
+      [[u, o.ventas, o.honorarios, o.remuneraciones, o.facturas, costos, res]]);
+    $("tblERSucursal").innerHTML=""; $("tblERSucursal").appendChild(erDiv);
+
+    const areas = Array.from(o.byArea.values()).sort((a,b)=>a.area.localeCompare(b.area,"es"));
+    const rows = areas.map(a=>[a.area, a.honorarios, a.remuneraciones, a.facturas, a.totalCostos, a.resultadoAcum]);
+    const t = document.createElement("div");
+    renderTable(t, ["Área","Honorarios","Remuneraciones","Facturas","Total costos área","Resultado acumulado"], rows);
+    $("tblAreasSucursal").innerHTML=""; $("tblAreasSucursal").appendChild(t);
+
+    const wrap = $("detAreasSucursal");
+    wrap.innerHTML = "";
+    for(const a of areas){
+      const det = document.createElement("details");
+      const sum = document.createElement("summary");
+      sum.textContent = `${a.area} · Total costos: ${money(a.totalCostos)} · Resultado acum: ${money(a.resultadoAcum)}`;
+      det.appendChild(sum);
+
+      const rm = o.detRemu.get(a.area) || new Map();
+      if(rm.size){
+        const rowsR = Array.from(rm.entries()).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1])).map(([n,v])=>[n,v]);
+        const div = document.createElement("div");
+        div.style.marginTop="10px";
+        div.innerHTML = `<div class="title" style="margin:10px 0 8px;">Remuneraciones → Personas</div>`;
+        const tbl = document.createElement("div");
+        renderTable(tbl, ["Persona","Monto"], rowsR);
+        div.appendChild(tbl);
+        det.appendChild(div);
+      } else {
+        const p = document.createElement("div");
+        p.className="msg"; p.style.marginTop="10px";
+        p.textContent="Remuneraciones: sin registros en esta área.";
+        det.appendChild(p);
+      }
+
+      const bm = o.detBoletas.get(a.area) || new Map();
+      if(bm.size){
+        const rowsB = Array.from(bm.entries()).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1])).map(([n,v])=>[n,v]);
+        const div = document.createElement("div");
+        div.style.marginTop="12px";
+        div.innerHTML = `<div class="title" style="margin:10px 0 8px;">Boletas → Personas</div>`;
+        const tbl = document.createElement("div");
+        renderTable(tbl, ["Persona","Monto neto"], rowsB);
+        div.appendChild(tbl);
+        det.appendChild(div);
+      } else {
+        const p = document.createElement("div");
+        p.className="msg"; p.style.marginTop="10px";
+        p.textContent="Boletas: sin registros en esta área.";
+        det.appendChild(p);
+      }
+
+      const fm = o.detFacturas.get(a.area) || new Map();
+      if(fm.size){
+        const rowsF = Array.from(fm.entries()).sort((x,y)=>Math.abs(y[1])-Math.abs(x[1])).map(([n,v])=>[n,v]);
+        const div = document.createElement("div");
+        div.style.marginTop="12px";
+        div.innerHTML = `<div class="title" style="margin:10px 0 8px;">Facturas → Proveedores</div>`;
+        const tbl = document.createElement("div");
+        renderTable(tbl, ["Proveedor","Monto neto"], rowsF);
+        div.appendChild(tbl);
+        det.appendChild(div);
+      } else {
+        const p = document.createElement("div");
+        p.className="msg"; p.style.marginTop="10px";
+        p.textContent="Facturas: sin registros en esta área.";
+        det.appendChild(p);
+      }
+
+      wrap.appendChild(det);
+      const spacer = document.createElement("div");
+      spacer.style.height="10px";
+      wrap.appendChild(spacer);
+    }
+  }
+
+  function refreshCounts(){
+    $("counts").innerHTML = `
+      <div>Ventas: <b>${state.data.ventas.length}</b> filas · <b>${state.files.ventas.length}</b> archivos</div>
+      <div>Boletas: <b>${state.data.boletas.length}</b> filas · <b>${state.files.boletas.length}</b> archivos</div>
+      <div>Remuneraciones: <b>${state.data.remu.length}</b> filas · <b>${state.files.remu.length}</b> archivos</div>
+      <div>Facturas: <b>${state.data.facturas.length}</b> filas · <b>${state.files.facturas.length}</b> archivos</div>
+      <div>Sucursales detectadas: <b>${state.report ? state.report.unitList.length : 0}</b></div>
+    `;
+  }
+
+  function refreshAll(){
+    $("btnExportER").disabled = !state.report;
+    refreshSelector();
+    refreshOverview();
+    refreshSucursal();
+    refreshCounts();
+  }
+
+  function setTab(name){
+    const map = {overview:"view-overview", sucursal:"view-sucursal", datos:"view-datos"};
+    for(const k of Object.keys(map)){
+      $(map[k]).style.display = (k===name) ? "" : "none";
+    }
+    document.querySelectorAll(".tab").forEach(btn=>{
+      btn.classList.toggle("active", btn.dataset.tab===name);
+    });
+  }
+  document.querySelectorAll(".tab").forEach(btn=>{
+    btn.addEventListener("click", ()=>setTab(btn.dataset.tab));
+  });
+
+  $("selSucursal").addEventListener("change", refreshSucursal);
+
+  $("btnRecalc").addEventListener("click", ()=>{
+    try{
+      state.report = calcReport();
+      refreshAll();
+      setMsg("Reporte recalculado ✅", "ok");
+    } catch(err){
+      state.report = null;
+      refreshAll();
+      setMsg(String(err.message || err), "bad");
+    }
+  });
+
+  $("btnReset").addEventListener("click", ()=>{
+    state.files = { ventas:[], boletas:[], remu:[], facturas:[] };
+    state.data  = { ventas:[], boletas:[], remu:[], facturas:[] };
+    state.report = null;
+    updateFileList("ventas"); updateFileList("boletas"); updateFileList("remu"); updateFileList("facturas");
+    $("inVentas").value=""; $("inBoletas").value=""; $("inRemu").value=""; $("inFacturas").value="";
+    refreshAll();
+    setMsg("Todo limpio. Vuelve a arrastrar archivos y recalcula.", "");
+  });
+
+  $("btnExportER").addEventListener("click", ()=>{
+    if(!state.report) return;
+    const r = state.report;
+    const lines = [];
+    lines.push(["sucursal","ventas","honorarios","remuneraciones","facturas","total_costos","resultado"].join(","));
+    for(const u of r.unitList){
+      const o = r.byUnit.get(u);
+      const total = o.honorarios + o.remuneraciones + o.facturas;
+      const res = o.ventas - total;
+      lines.push([`"${u.replace(/"/g,'""')}"`, o.ventas, o.honorarios, o.remuneraciones, o.facturas, total, res].join(","));
+    }
+    downloadText("estado_resultados_sucursal.csv", lines.join("\n"), "text/csv");
+  });
+
+  refreshAll();
+})();
+</script>
+</body>
+</html>
